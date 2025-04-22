@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
-const pool = require("./db"); //Using the DB connection from fastcomet
+const pool = require("./db/pool"); //Using the DB connection from fastcomet
+const userRoutes = require("./routes/users"); //Using user routes
 require("dotenv").config(); //to load up env variables
 
 const app = express();
@@ -8,6 +9,7 @@ const PORT = 3000;
 
 app.use(cors());
 app.use(express.json());
+app.use("/api/users", userRoutes);
 
 
 // Testing DB connection
@@ -25,20 +27,6 @@ app.get("/test-db", (req, res) => {
 app.get("/", (req, res) => {
 	res.json({ message: "Backend is running!" });
 });
-
-app.post("/register", (req, res) => {
-	res.json({ message: "Register endpoint placeholder" });
-});
-
-app.post("/login", (req, res) => {
-	res.json({ message: "Login endpoint placeholder" });
-});
-
-app.post("/auth/google", (req, res) => {
-	res.json({ message: "Google auth endpoint placeholder" });
-});
-
-
 
 app.listen(PORT, () => {
 	console.log(`Server running at http://localhost:${PORT}`);
