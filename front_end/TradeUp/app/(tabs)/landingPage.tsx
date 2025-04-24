@@ -44,6 +44,8 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     width: '100%',
+    maxWidth: 400,       // limit width on web
+    alignSelf: 'center', // center within parent
   },
   loginButton: {
     backgroundColor: '#4CAF50',  // Green button background
