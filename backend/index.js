@@ -13,15 +13,16 @@ app.use("/api/users", userRoutes);
 
 
 // Testing DB connection
-app.get("/test-db", (req, res) => {
-	pool.query("SELECT 1 + 1 AS solution", (err, results) => {
-	  if (err) {
-		console.error("DB error:", err);
-		return res.status(500).json({ error: "Database connection failed" });
-	  }
+app.get("/test-db", async (req, res) => {
+	try {
+	  const [results] = await pool.query("SELECT 1 + 1 AS solution");
 	  res.json({ message: "Database connected!", result: results[0].solution });
-	});
+	} catch (err) {
+	  console.error("DB error:", err);
+	  res.status(500).json({ error: "Database connection failed" });
+	}
   });
+  
 
 //Here are some routes I created as placeholders 
 app.get("/", (req, res) => {
