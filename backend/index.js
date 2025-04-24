@@ -9,26 +9,27 @@ const PORT = 3000;
 
 app.use(cors());
 app.use(express.json());
-app.use("/api/users", userRoutes);
+app.use(express.urlencoded({ extended: true }));
 
+// Routes
+app.use("/api/users", userRoutes);
 
 // Testing DB connection
 app.get("/test-db", async (req, res) => {
-	try {
-	  const [results] = await pool.query("SELECT 1 + 1 AS solution");
-	  res.json({ message: "Database connected!", result: results[0].solution });
-	} catch (err) {
-	  console.error("DB error:", err);
-	  res.status(500).json({ error: "Database connection failed" });
-	}
-  });
-  
+  try {
+    const [rows] = await pool.query("SELECT 1 + 1 AS solution");
+    res.json({ message: "Database connected!", result: rows[0].solution });
+  } catch (err) {
+    console.error("DB error:", err);
+    res.status(500).json({ error: "Database connection failed" });
+  }
+});
 
-//Here are some routes I created as placeholders 
+// Basic route
 app.get("/", (req, res) => {
-	res.json({ message: "Backend is running!" });
+  res.json({ message: "Backend is running!" });
 });
 
 app.listen(PORT, () => {
-	console.log(`Server running at http://localhost:${PORT}`);
+  console.log(`Server running at http://localhost:${PORT}`);
 });

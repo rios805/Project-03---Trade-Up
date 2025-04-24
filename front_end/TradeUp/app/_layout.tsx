@@ -1,39 +1,35 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { useFonts } from 'expo-font';
-import { Stack } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/useColorScheme';
-
-// Prevent the splash screen from auto-hiding before asset loading is complete.
-SplashScreen.preventAutoHideAsync();
+import { Stack } from "expo-router";
+import { useEffect, useState } from "react";
+import { View, ActivityIndicator } from "react-native";
+import { auth } from "../utils/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
-  const [loaded] = useFonts({
-    SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
-  });
+	const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
 
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
+	useEffect(() => {
+		const unsubscribe = onAuthStateChanged(auth, (user) => {
+			setIsAuthenticated(!!user);
+		});
 
-  if (!loaded) {
-    return null;
-  }
+		return unsubscribe;
+	}, []);
 
-  return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
-  );
+	if (isAuthenticated === null) {
+		// this shhows loading indicator while checking auth state (at least it should)
+		return (
+			<View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#000" }}>
+				<ActivityIndicator size="large" color="#4CAF50" />
+			</View>
+		);
+	}
+
+	return (
+		<Stack>
+			<Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+			<Stack.Screen name="+not-found" options={{ title: "Oops!" }} />
+			<Stack.Screen name="pages/login" options={{ headerShown: false }} />
+			<Stack.Screen name="pages/signUp" options={{ headerShown: false }} />
+		</Stack>
+	);
 }
