@@ -10,7 +10,7 @@ async function findOrCreateUser(firebaseUser) {
 
   // Check if user exists
   const [rows] = await pool.promise().query(
-    "SELECT * FROM users WHERE id = ?",
+    "SELECT * FROM users WHERE firebase_uid = ?",
     [uid]
   );
 
@@ -20,21 +20,21 @@ async function findOrCreateUser(firebaseUser) {
 
   // Create new user
   await pool.promise().query(
-    "INSERT INTO users (id, username, email, trade_credit) VALUES (?, ?, ?, ?)",
-    [uid, name, email, 0]
+    "INSERT INTO users (username, email, trade_credit, firebase_uid) VALUES (?, ?, ?, ?)",
+    [name, email, 0, uid]
   );
 
   return {
-    id: uid,
     username: name,
     email,
-    trade_credit: 0
+    trade_credit: 0,
+    firebase_uid: uid
   };
 }
 
 /**
  * Updates a user's trade credit by amount (+/-)
- * @param {string} userId - Firebase UID
+ * @param {string} userId - User ID
  * @param {number} delta - Amount to add/subtract
  * @returns {number} New credit balance
  */
