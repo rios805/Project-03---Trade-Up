@@ -1,66 +1,52 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { loginUser } from '../../utils/firebase';
+import { View, Text, TextInput, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const { width } = useWindowDimensions();
+
+  const isWeb = width >= 768;
+
   const router = useRouter();
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter both email and password');
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      await loginUser(email, password);
-      // Navigate to main screen after successful login
-      router.replace('/(tabs)');
-    } catch (error: any) {
-      Alert.alert('Login Failed', error.message);
-    } finally {
-      setLoading(false);
-    }
+  const handleLogin = () => {
+    console.log('Logging in with:', email, password);
+    router.push('/pages/profile');
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Log In</Text>
+      <View style={[styles.formContainer, isWeb && styles.webForm]}>
+        <Text style={styles.title}>Log In</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        placeholderTextColor="#ccc"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        value={email}
-        onChangeText={setEmail}
-      />
+        <TextInput
+          style={[styles.input, isWeb && styles.inputWeb]}
+          placeholder="Email"
+          placeholderTextColor="#ccc"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          value={email}
+          onChangeText={setEmail}
+        />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor="#ccc"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+        <TextInput
+          style={[styles.input, isWeb && styles.inputWeb]}
+          placeholder="Password"
+          placeholderTextColor="#ccc"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+        />
 
-      <Pressable 
-        style={[styles.loginButton, loading && styles.disabledButton]} 
-        onPress={handleLogin}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" size="small" />
-        ) : (
+        <Pressable
+          style={[styles.loginButton, isWeb && styles.buttonWeb]}
+          onPress={handleLogin}
+        >
           <Text style={styles.loginText}>Log In</Text>
-        )}
-      </Pressable>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -71,6 +57,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
     justifyContent: 'center',
     padding: 24,
+    alignItems: 'center',
+  },
+  formContainer: {
+    width: '100%',
+  },
+  webForm: {
+    maxWidth: 400,
+    width: '100%',
   },
   title: {
     fontSize: 32,
@@ -89,15 +83,20 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     fontSize: 16,
     color: '#fff',
+    width: '100%',
+  },
+  inputWeb: {
+    alignSelf: 'center',
   },
   loginButton: {
     backgroundColor: '#4CAF50',
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
+    width: '100%',
   },
-  disabledButton: {
-    opacity: 0.7,
+  buttonWeb: {
+    alignSelf: 'center',
   },
   loginText: {
     color: '#fff',
