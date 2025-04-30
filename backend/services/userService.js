@@ -8,9 +8,9 @@ const pool = require("../db/pool");
 async function findOrCreateUser(firebaseUser) {
   const { uid, email, name } = firebaseUser;
 
-  // Check if user exists
+  // Check if user exists using the firebase_uid instead of id
   const [rows] = await pool.promise().query(
-    "SELECT * FROM users WHERE id = ?",
+    "SELECT * FROM users WHERE firebase_uid = ?",
     [uid]
   );
 
@@ -20,12 +20,12 @@ async function findOrCreateUser(firebaseUser) {
 
   // Create new user
   await pool.promise().query(
-    "INSERT INTO users (id, username, email, trade_credit) VALUES (?, ?, ?, ?)",
-    [uid, name, email, 0]
+    "INSERT INTO users (username, email, trade_credit, firebase_uid) VALUES (?, ?, ?, ?)",
+    [name, email, 0, uid]
   );
 
   return {
-    id: uid,
+    firebase_uid: uid,
     username: name,
     email,
     trade_credit: 0
