@@ -1,19 +1,33 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  useWindowDimensions,
+} from 'react-native';
 import { useRouter } from 'expo-router';
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '../../utils/firebaseConfig'; // ✅ your config path
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const { width } = useWindowDimensions();
-
   const isWeb = width >= 768;
-
   const router = useRouter();
 
-  const handleLogin = () => {
-    console.log('Logging in with:', email, password);
-    router.push('/pages/profile');
+  const handleLogin = async () => {
+    console.log('🔐 Attempting login with:', email);
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      console.log('✅ Logged in user:', userCredential.user.email);
+      router.push('/pages/profile');
+    } catch (error: any) {
+      console.error('❌ Login error:', error.message);
+      alert('Login failed: ' + error.message);
+    }
   };
 
   return (
