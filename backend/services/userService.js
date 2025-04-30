@@ -8,7 +8,7 @@ const pool = require("../db/pool");
 async function findOrCreateUser(firebaseUser) {
   const { uid, email, name } = firebaseUser;
 
-  // Check if user exists using the firebase_uid instead of id
+  // Check if user exists
   const [rows] = await pool.promise().query(
     "SELECT * FROM users WHERE firebase_uid = ?",
     [uid]
@@ -25,16 +25,16 @@ async function findOrCreateUser(firebaseUser) {
   );
 
   return {
-    firebase_uid: uid,
     username: name,
     email,
-    trade_credit: 0
+    trade_credit: 0,
+    firebase_uid: uid
   };
 }
 
 /**
  * Updates a user's trade credit by amount (+/-)
- * @param {string} userId - Firebase UID
+ * @param {string} userId - User ID
  * @param {number} delta - Amount to add/subtract
  * @returns {number} New credit balance
  */
