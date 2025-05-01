@@ -5,6 +5,7 @@ const userRoutes = require("./routes/users"); //Using user routes
 const itemRoutes = require("./routes/items"); //Using item routes
 const tradeRoutes = require("./routes/trades"); // Using trade routes
 const challengeRoutes = require("./routes/challenges"); // Using challenge routes
+const scoreRoutes = require("./routes/scores"); //Using score routes
 require("dotenv").config(); //to load up env variables
 
 const app = express();
@@ -19,6 +20,8 @@ app.use("/api/users", userRoutes);
 app.use("/api/items", itemRoutes);
 app.use("/api/trades", tradeRoutes); 
 app.use("/api/challenges", challengeRoutes);
+app.use("/api/scores", scoreRoutes);
+
 
 // Testing DB connection
 app.get("/test-db", async (req, res) => {
