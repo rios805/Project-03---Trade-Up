@@ -6,30 +6,29 @@ const pool = require("../db/pool");
  * @returns {Object} User record from DB
  */
 async function findOrCreateUser(firebaseUser) {
-  const { uid, email, name } = firebaseUser;
+	const { uid, email, name } = firebaseUser;
 
-  // Check if user exists
-  const [rows] = await pool.promise().query(
-    "SELECT * FROM users WHERE firebase_uid = ?",
-    [uid]
-  );
+	return new Promise((resolve, reject) => {
+		pool.query("SELECT * FROM users WHERE firebase_uid = ?", [uid], (err, rows) => {
+			if (err) return reject(err);
 
-  if (rows.length > 0) {
-    return rows[0];
-  }
+			if (rows.length > 0) {
+				return resolve(rows[0]);
+			}
 
-  // Create new user
-  await pool.promise().query(
-    "INSERT INTO users (username, email, trade_credit, firebase_uid) VALUES (?, ?, ?, ?)",
-    [name, email, 0, uid]
-  );
+			// Create new user
+			pool.query("INSERT INTO users (username, email, trade_credit, firebase_uid) VALUES (?, ?, ?, ?)", [name, email, 0, uid], (err) => {
+				if (err) return reject(err);
 
-  return {
-    username: name,
-    email,
-    trade_credit: 0,
-    firebase_uid: uid
-  };
+				resolve({
+					username: name,
+					email,
+					trade_credit: 0,
+					firebase_uid: uid,
+				});
+			});
+		});
+	});
 }
 
 /**
@@ -39,33 +38,32 @@ async function findOrCreateUser(firebaseUser) {
  * @returns {number} New credit balance
  */
 async function updateTradeCredit(userId, delta) {
-  await pool.promise().query(
-    "UPDATE users SET trade_credit = trade_credit + ? WHERE id = ?",
-    [delta, userId]
-  );
+	return new Promise((resolve, reject) => {
+		pool.query("UPDATE users SET trade_credit = trade_credit + ? WHERE id = ?", [delta, userId], (err) => {
+			if (err) return reject(err);
 
-  const [rows] = await pool.promise().query(
-    "SELECT trade_credit FROM users WHERE id = ?",
-    [userId]
-  );
-
-  return rows[0]?.trade_credit ?? null;
+			pool.query("SELECT trade_credit FROM users WHERE id = ?", [userId], (err, rows) => {
+				if (err) return reject(err);
+				resolve(rows[0]?.trade_credit ?? null);
+			});
+		});
+	});
 }
 
 /**
  * Sets a user's trade credit to an exact value for testing purposes
  */
 async function setTradeCredit(userId, newAmount) {
-  await pool.promise().query(
-    "UPDATE users SET trade_credit = ? WHERE id = ?",
-    [newAmount, userId]
-  );
-
-  return newAmount;
+	return new Promise((resolve, reject) => {
+		pool.query("UPDATE users SET trade_credit = ? WHERE id = ?", [newAmount, userId], (err) => {
+			if (err) return reject(err);
+			resolve(newAmount);
+		});
+	});
 }
 
 module.exports = {
-  findOrCreateUser,
-  updateTradeCredit,
-  setTradeCredit
+	findOrCreateUser,
+	updateTradeCredit,
+	setTradeCredit,
 };

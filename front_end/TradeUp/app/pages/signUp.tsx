@@ -1,104 +1,78 @@
-// works but doenst store user in database just authenticates them
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
-import { createUserWithEmailAndPassword } from 'firebase/auth';  // Import Firebase function
-import { auth } from '../../utils/firebaseConfig';  // Your Firebase config
-import { useNavigation } from '@react-navigation/native';  // For navigation
+import { View, Text, TextInput, Pressable, StyleSheet, useWindowDimensions, Alert } from 'react-native';
+import { createUserWithEmailAndPassword, getIdToken } from 'firebase/auth';
+import { auth } from '../../utils/firebaseConfig';
 import { useRouter } from 'expo-router';
+import axios from 'axios';
 
 export default function SignUpScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [signUpSuccess, setSignUpSuccess] = useState(false);  // State to show success message and login button
+  const [signUpSuccess, setSignUpSuccess] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const { width } = useWindowDimensions();
   const isWeb = width >= 768;
 
   const router = useRouter();
 
-  // Handle sign up logic
-  // just verifies the firebase token
-
   const handleSignUp = async () => {
-    console.log('Signing up with:', name, email, password);
+    if (!name || !email || !password) {
+      Alert.alert('Error', 'Please fill in all fields');
+      return;
+    }
+    
+    setIsLoading(true);
+    console.log('🔐 Signing up with:', { name, email });
 
     try {
-      // Create a new user with Firebase
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
-      console.log('Account created successfully:', user);
+      console.log('✅ Firebase user created:', user.email);
 
-      // Update state to show success message
+      const token = await user.getIdToken();
+      console.log('🔐 Got Firebase ID token');
+
+      const backendUrl = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/users/me`;
+      console.log('Sending user data to:', backendUrl);
+
+      const response = await axios.post(
+        backendUrl,
+        { username: name },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      console.log('✅ User saved to DB:', response.data);
       setSignUpSuccess(true);
-    } catch (error: any) {
-      // Handle errors (e.g., weak password, existing account)
-      console.error('Error creating account:', error.message);
-      alert('Error creating account: ' + error.message);
+    } catch (error) {
+      if (error instanceof Error) {
+        console.error('❌ Error during sign-up:', error.message);
+        Alert.alert('Error', 'Failed to sign up: ' + error.message);
+
+
+        if (auth.currentUser) {
+          try {
+            await auth.currentUser.delete();
+            console.log('🗑️ Rolled back Firebase user creation due to backend error');
+          } catch (deleteError) {
+            console.error('⚠️ Failed to delete Firebase user after backend error');
+          }
+        }
+      } else {
+        console.error('❌ Unexpected error during sign-up:', error);
+        Alert.alert('Error', 'An unexpected error occurred');
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
 
-
-
-  // verifies firebase token and tries to add user to the database
-
-  // const handleSignUp = async () => {
-  //   console.log('🔐 Signing up with:', { name, email });
-
-  //   try {
-  //     // 1. Sign up with Firebase Authentication
-  //     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-  //     const user = userCredential.user;
-  //     console.log('✅ Firebase user created:', user.email);
-
-  //     // 2. Get Firebase ID token
-  //     const token = await user.getIdToken();
-  //     console.log('🔐 Got Firebase ID token:', token);
-
-  //     // 3. Send POST request to backend to create user in DB
-  //     const backendUrl = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/users/me`;
-  //     console.log('Backend URL:', backendUrl);
-
-  //     const response = await axios.post(
-  //       backendUrl,
-  //       { username: name },  // Include the username in the request body
-  //       {
-  //         headers: {
-  //           Authorization: `Bearer ${token}`,
-  //           'Content-Type': 'application/json',  // Make sure to specify JSON content type
-  //         },
-  //       }
-  //     );
-
-  //     console.log('✅ User saved to DB:', response.data);
-  //     setSignUpSuccess(true);
-
-  //   } catch (error: unknown) {
-  //     // Type assertion to 'Error' so that we can access 'message'
-  //     if (error instanceof Error) {
-  //       console.error('❌ Error during sign-up:', error.message);
-
-  //       // If Firebase user was created, delete them
-  //       const user = auth.currentUser;
-  //       if (user) {
-  //         try {
-  //           await deleteUser(user);
-  //           console.log('🗑️ Rolled back Firebase user creation');
-  //         } catch (deleteError) {
-  //           console.error('⚠️ Failed to delete Firebase user after DB error:', deleteError);
-  //         }
-  //       }
-
-  //       Alert.alert('Error', 'Failed to sign up: ' + error.message);
-  //     } else {
-  //       console.error('❌ Unexpected error during sign-up:', error);
-  //       Alert.alert('Error', 'An unexpected error occurred');
-  //     }
-  //   }
-  // };
-
-
-
-  const handleLoginNav = async () => {
+  const handleLoginNav = () => {
     router.push('/pages/login');
   };
 
@@ -144,8 +118,14 @@ export default function SignUpScreen() {
             onChangeText={setPassword}
           />
 
-          <Pressable style={styles.signUpButton} onPress={handleSignUp}>
-            <Text style={styles.buttonText}>Sign Up</Text>
+          <Pressable 
+            style={[styles.signUpButton, isLoading && styles.buttonDisabled]} 
+            onPress={handleSignUp}
+            disabled={isLoading}
+          >
+            <Text style={styles.buttonText}>
+              {isLoading ? 'Creating Account...' : 'Sign Up'}
+            </Text>
           </Pressable>
         </View>
       )}
@@ -198,6 +178,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     width: '100%',
+  },
+  buttonDisabled: {
+    backgroundColor: '#2E7D32', // Darker green when disabled
+    opacity: 0.7,
   },
   loginButton: {
     backgroundColor: '#FF6347',  // Login button in a different color
