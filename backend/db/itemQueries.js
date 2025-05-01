@@ -13,6 +13,22 @@ async function getItemsByOwner(userId) {
   return rows;
 }
 
+async function getItemById(id) {
+  const [rows] = await pool.promise().query(
+    "SELECT * FROM items WHERE id = ?",
+    [id]
+  );
+  return rows[0]; 
+}
+
+async function getItemByName(name) {
+  const [rows] = await pool.promise().query(
+    "SELECT * FROM items WHERE name = ?",
+    [name]
+  );
+  return rows;
+}
+
 async function createItem({ name, description, image_url, hidden_value, item_type, owner_id }) {
   const [result] = await pool.promise().query(
     "INSERT INTO items (name, description, image_url, hidden_value, item_type, owner_id) VALUES (?, ?, ?, ?, ?, ?)",
@@ -24,5 +40,7 @@ async function createItem({ name, description, image_url, hidden_value, item_typ
 module.exports = {
   getAllItems,
   getItemsByOwner,
+  getItemById,
+  getItemByName,
   createItem
 };
