@@ -1,80 +1,53 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { registerUser } from '../../utils/firebase';
-import { useRouter } from 'expo-router';
+import { View, Text, TextInput, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 
 export default function SignUpScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const { width } = useWindowDimensions();
+  const isWeb = width >= 768;
 
-  const handleSignUp = async () => {
-    if (!email || !password || !name) {
-      Alert.alert('Error', 'Please enter username, email, and password');
-      return;
-    }
-    
-    setLoading(true);
-    try {
-      await registerUser(email, password, name);
-      
-      Alert.alert('Success', 'Account created successfully', [
-        {
-          text: 'OK',
-          onPress: () => router.replace('/(tabs)')
-        }
-      ]);
-    } catch (error: any) {
-      Alert.alert('Registration Failed', error.message);
-    } finally {
-      setLoading(false);
-    }
+  const handleSignUp = () => {
+    console.log('Signing up with:', name, email, password);
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Create Account</Text>
+      <View style={[styles.formContainer, isWeb && styles.webForm]}>
+        <Text style={styles.title}>Create Account</Text>
 
-      <TextInput
-        style={styles.input}
-        placeholder="Username"
-        placeholderTextColor="#ccc"
-        value={name}
-        onChangeText={setName}
-      />
+        <TextInput
+          style={styles.input}
+          placeholder="Name"
+          placeholderTextColor="#ccc"
+          value={name}
+          onChangeText={setName}
+        />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Email"
-        placeholderTextColor="#ccc"
-        keyboardType="email-address"
-        autoCapitalize="none"
-        value={email}
-        onChangeText={setEmail}
-      />
+        <TextInput
+          style={styles.input}
+          placeholder="Email"
+          placeholderTextColor="#ccc"
+          keyboardType="email-address"
+          autoCapitalize="none"
+          value={email}
+          onChangeText={setEmail}
+        />
 
-      <TextInput
-        style={styles.input}
-        placeholder="Password"
-        placeholderTextColor="#ccc"
-        secureTextEntry
-        value={password}
-        onChangeText={setPassword}
-      />
+        <TextInput
+          style={styles.input}
+          placeholder="Password"
+          placeholderTextColor="#ccc"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+        />
 
-      <Pressable 
-        style={[styles.signUpButton, loading && styles.disabledButton]} 
-        onPress={handleSignUp}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#fff" size="small" />
-        ) : (
+        <Pressable style={styles.signUpButton} onPress={handleSignUp}>
           <Text style={styles.buttonText}>Sign Up</Text>
-        )}
-      </Pressable>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -84,7 +57,14 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
     justifyContent: 'center',
+    alignItems: 'center', // Center on wide screens
     padding: 24,
+  },
+  formContainer: {
+    width: '100%',
+  },
+  webForm: {
+    maxWidth: 400,
   },
   title: {
     fontSize: 32,
@@ -103,15 +83,14 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     fontSize: 16,
     color: '#fff',
+    width: '100%',
   },
   signUpButton: {
     backgroundColor: '#4CAF50',
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
-  },
-  disabledButton: {
-    opacity: 0.7,
+    width: '100%',
   },
   buttonText: {
     color: '#fff',
@@ -119,3 +98,4 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
 });
+
