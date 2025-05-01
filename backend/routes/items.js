@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const authenticate = require("../authMiddleware");
-const { getAllItems, getItemsByOwner, createItem } = require("../db/itemQueries");
+const { getAllItems, getItemsByOwner, createItem, getItemById } = require("../db/itemQueries");
 
 router.get("/test", async (req, res) => {
 	try {
@@ -61,28 +61,6 @@ router.get("/marketplace", authenticate, async (req, res) => {
 	}
   });
 
-  // GET /api/items/user/me - Get items owned by the current user
-router.get("/user/me", authenticate, async (req, res) => {
-	try {
-	  const userId = req.user.uid;
-	  const items = await getItemsByOwner(userId);
-	  res.json({ items });
-	} catch (err) {
-	  console.error("Error fetching current user items:", err);
-	  res.status(500).json({ error: "Failed to fetch your items" });
-	}
-  });
-
-  // GET /api/items/user/:userId - Get items owned by a specific user
-router.get("/user/:userId", authenticate, async (req, res) => {
-	try {
-	  const items = await getItemsByOwner(req.params.userId);
-	  res.json({ items });
-	} catch (err) {
-	  console.error("Error fetching user items:", err);
-	  res.status(500).json({ error: "Failed to fetch user items" });
-	}
-  });
 
   // POST /api/items/create - Create a new item
 router.post("/create", authenticate, async (req, res) => {
@@ -112,16 +90,13 @@ router.post("/create", authenticate, async (req, res) => {
   // GET /api/items/:itemId - Get a specific item by ID
 router.get("/:itemId", authenticate, async (req, res) => {
 	try {
-	  // This would need to be implemented in itemQueries.js
 	  const itemId = req.params.itemId;
-	  // const item = await getItemById(itemId);
-	  
-	  // This is  Placeholder response until getItemById gets implemented
-	  //I'm to lazy to implement it right now
-	  res.json({ 
-		message: "This endpoint would return a specific item",
-		itemId: itemId
-	  });
+	  const item = await getItemById(itemId);
+
+	  if (!item) {
+		return res.status(404).json({error: "Item not found"});
+	  }
+	  res.json({ item });
 	} catch (err) {
 	  console.error("Error fetching item:", err);
 	  res.status(500).json({ error: "Failed to fetch item" });

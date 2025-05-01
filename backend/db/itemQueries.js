@@ -37,10 +37,19 @@ async function createItem({ name, description, image_url, hidden_value, item_typ
   return result.insertId;
 }
 
+async function updateItemOwner(itemId, newOwnerId) {
+  const [result] = await pool.query(
+    "UPDATE items SET owner_id = ? WHERE id = ?",
+    [newOwnerId, itemId]
+  );
+  return result.affectedRows;
+}
+
 module.exports = {
   getAllItems,
   getItemsByOwner,
   getItemById,
   getItemByName,
-  createItem
+  createItem,
+  updateItemOwner
 };
