@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const authenticate = require("../authMiddleware");
-const { createTrade, getTradesByUser, updateTradeStatus } = require("../db/tradeQueries");
-const { getItemsByOwner } = require("../db/itemQueries");
+const { createTrade, getTradesByUser, updateTradeStatus, getTradeById } = require("../db/tradeQueries");
+const { getItemsByOwner, updateItemOwner } = require("../db/itemQueries");
 
 // Ignore this route, this is just for testing purposes will get removed later
 router.get("/test", async (req, res) => {
@@ -69,19 +69,27 @@ router.patch("/:tradeId/respond", authenticate, async (req, res) => {
 		const { status } = req.body;
 		const userId = req.user.uid;
 
-		// This is to verify that this user is the responder for this trade
-		// (NOT YET Working) This verification will need to be added to the tradeQueries.js file
-		// I'm doing this later (This route might be changed to have different logic)
-
 		if (status !== "accepted" && status !== "rejected") {
 			return res.status(400).json({ error: "Status must be 'accepted' or 'rejected'" });
 		}
 
+		const trade = await getTradeById(tradeId);
+
+		if (!trade) {
+			return res.status(404).json({ error: "Trade not found" });
+		}
+
+		if (trade.responder_id != userId) {
+			return res.status(403).json({ error: "You are not authorized to respond to this trade" });
+		}
+
 		await updateTradeStatus(tradeId, status);
 
-		// IF this is accepted, we need to update the ownership of the items involved
-		// This requires aditional logic to transfer the items between users
-		// For now, we will just return a success message
+		if (status === "accepted") {
+			// Swap ownership of both items
+			await updateItemOwner(trade.item_offered_id, trade.responder_id);
+			await updateItemOwner(trade.item_requested_id, trade.requester_id);
+		}
 
 		res.json({
 			message: `Trade ${status}`,
@@ -93,17 +101,17 @@ router.patch("/:tradeId/respond", authenticate, async (req, res) => {
 	}
 });
 
+
 // GET /api/trades/:tradeId - Get details of a specific trade
 router.get("/:tradeId", authenticate, async (req, res) => {
 	try {
-		// This would need an additional query function to get a single trade by ID
-		const { tradeId } = req.params;
+		const trade = await getTradeById(req.params.tradeId);
 
-		// Placeholder response until I implement getTradeById
-		res.json({
-			message: "This endpoint will return details for a specific trade",
-			tradeId,
-		});
+		if (!trade) {
+			return res.status(404).json({ error: "Trade not found" });
+		}
+
+		res.json({ trade });
 	} catch (err) {
 		console.error("Error fetching trade:", err);
 		res.status(500).json({ error: "Failed to fetch trade details" });

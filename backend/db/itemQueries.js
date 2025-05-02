@@ -22,6 +22,22 @@ async function getItemsByOwner(userId) {
   });
 }
 
+async function getItemById(id) {
+  const [rows] = await pool.promise().query(
+    "SELECT * FROM items WHERE id = ?",
+    [id]
+  );
+  return rows[0];
+}
+
+async function getItemByName(name) {
+  const [rows] = await pool.promise().query(
+    "SELECT * FROM items WHERE name = ?",
+    [name]
+  );
+  return rows;
+}
+
 async function createItem({ name, description, image_url, hidden_value, item_type, owner_id }) {
   return new Promise((resolve, reject) => {
     pool.query(
@@ -35,8 +51,19 @@ async function createItem({ name, description, image_url, hidden_value, item_typ
   });
 }
 
+async function updateItemOwner(itemId, newOwnerId) {
+  const [result] = await pool.query(
+    "UPDATE items SET owner_id = ? WHERE id = ?",
+    [newOwnerId, itemId]
+  );
+  return result.affectedRows;
+}
+
 module.exports = {
   getAllItems,
   getItemsByOwner,
-  createItem
+  getItemById,
+  getItemByName,
+  createItem,
+  updateItemOwner
 };

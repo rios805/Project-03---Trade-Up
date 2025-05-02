@@ -23,8 +23,18 @@ async function updateTradeStatus(tradeId, status) {
   );
 }
 
+async function getTradeById(tradeId) {
+  const [rows] = await pool.promise().query(
+    "SELECT * FROM trades WHERE id = ?",
+    [tradeId]
+  );
+  return rows[0] || null;
+}
+
+
 module.exports = {
   createTrade,
   getTradesByUser,
-  updateTradeStatus
+  updateTradeStatus,
+  getTradeById
 };
