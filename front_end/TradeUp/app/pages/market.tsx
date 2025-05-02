@@ -1,70 +1,50 @@
 //@ts-nocheck
-import React, { useState, useEffect, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, useWindowDimensions, ActivityIndicator, Alert, RefreshControl } from "react-native";
-import MarketItem from "../../components/MarketItem";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions, ActivityIndicator, Alert, RefreshControl, Pressable } from "react-native";
+import MarketItem from "../../components/MarketItem"; 
 import axios from "axios";
 import { auth } from "../../utils/firebaseConfig";
 
-interface MarketItemType {
-	id: number;
-	image_url: string;
-	hidden_value: number;
-	name: string;
-	description: string;
-}
-
 export default function Market() {
-	const [marketItems, setMarketItems] = useState([]);
+	const [allItems, setAllItems] = useState([]); 
+    const [viewMode, setViewMode] = useState('player'); 
 	const [loading, setLoading] = useState(true);
 	const [refreshing, setRefreshing] = useState(false);
 	const { width: screenWidth } = useWindowDimensions();
-	const ITEM_MARGIN = 10;
+	const ITEM_MARGIN = 10; 
+    const currentUserUid = auth.currentUser?.uid;
 
+	// This I left because in theory it should help for different size screens.
 	let columns = 5;
-	if (screenWidth < 600) {
-		columns = 2;
-	} else if (screenWidth < 900) {
-		columns = 3;
-	}
-
+	if (screenWidth < 600) { columns = 2; }
+    else if (screenWidth < 900) { columns = 3; }
 	const itemWidth = (screenWidth - ITEM_MARGIN * (columns + 1)) / columns;
 
 	const fetchMarketItems = useCallback(async () => {
-		console.log("Starting fetchMarketItems...");
-		setLoading(true);
-
+		console.log("[Market] Starting fetchMarketItems...");
+        if (!refreshing) setLoading(true);
 		try {
 			const user = auth.currentUser;
-			console.log("Current user:", user);
-
 			if (!user) {
-				Alert.alert("Not logged in", "Please log in to view market items.");
-				setLoading(false);
-				return;
-			}
-
-			const token = await user.getIdToken().catch((e) => {
-				console.error("Error getting token:", e);
-				throw e;
-			});
-			console.log("Got ID token");
-
+       
+                Alert.alert("Not logged in", "Please log in to view market items.");
+                setLoading(false); setRefreshing(false);
+                return;
+            }
+			const token = await user.getIdToken();
+			console.log("[Market] Got ID token");
 			const response = await axios.get(`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/items/marketplace`, {
-				headers: {
-					Authorization: `Bearer ${token}`,
-				},
+				headers: { Authorization: `Bearer ${token}` },
 			});
-
-			console.log("Got market items:", response.data.length);
-			setMarketItems(response.data);
+			console.log("[Market] Got all market items:", response.data.length);
+			setAllItems(response.data || []); // Stores the raw list
 		} catch (error) {
-			console.error("Failed to fetch market items:", error);
+            console.error("Failed to fetch market items:", error);
 			Alert.alert("Error", "Failed to load market items.");
-		} finally {
-			setLoading(false);
-			setRefreshing(false);
-		}
-	}, []);
+            setAllItems([]); // Clear items on error
+        }
+        finally { setLoading(false); setRefreshing(false); }
+	}, [refreshing]); 
 
 	const onRefresh = useCallback(() => {
 		setRefreshing(true);
@@ -72,35 +52,96 @@ export default function Market() {
 	}, [fetchMarketItems]);
 
 	useEffect(() => {
-		console.log("useEffect running...");
+		console.log("[Market] useEffect running...");
 		fetchMarketItems();
 	}, [fetchMarketItems]);
 
-	const handlePurchaseComplete = (itemId) => {
-		setMarketItems((prevItems) => prevItems.filter((item) => item.id !== itemId));
+
+    const filteredMarketItems = useMemo(() => {
+        if (viewMode === 'player') {
+            // Show items owned by OTHERS (This is the default view)
+            const playerItems = allItems.filter(item =>
+                item.ownerFirebaseUid !== null && // Must have an owner
+                item.ownerFirebaseUid !== currentUserUid // Owner must not be the current user
+            );
+            console.log(`[Market] Filtering for 'player' view: ${playerItems.length} items shown.`);
+            return playerItems;
+        } else { 
+            const systemItems = allItems.filter(item => item.ownerFirebaseUid === null);
+            console.log(`[Market] Filtering for 'system' view: ${systemItems.length} items shown.`);
+            return systemItems;
+        }
+    }, [allItems, viewMode, currentUserUid]); 
+
+
+	const handlePurchaseComplete = (purchasedItemId) => {
+        console.log(`[Market] Item ${purchasedItemId} purchased, removing from allItems list.`);
+        setAllItems((prevItems) => prevItems.filter((item) => item.id !== purchasedItemId));
 	};
 
 	return (
+		// Using a Fragment <>...</> as the top-level element (This is to allow the return of multple elements)
 		<>
 			<View style={styles.bannerContainer}>
 				<Text style={styles.bannerText}>Marketplace</Text>
 			</View>
+            <View style={styles.toggleContainer}>
+                <Pressable
+                    style={[styles.toggleButton, viewMode === 'player' && styles.toggleButtonActive]}
+                    onPress={() => setViewMode('player')}
+                >
+                    <Text style={[styles.toggleButtonText, viewMode === 'player' && styles.toggleButtonTextActive]}>
+                        Player Items (Trade/Buy)
+                    </Text>
+                </Pressable>
+                <Pressable
+                    style={[styles.toggleButton, viewMode === 'system' && styles.toggleButtonActive]}
+                    onPress={() => setViewMode('system')}
+                >
+                     <Text style={[styles.toggleButtonText, viewMode === 'system' && styles.toggleButtonTextActive]}>
+                        System Items (Buy Only)
+                    </Text>
+                </Pressable>
+            </View>
 
-			{loading && !refreshing ? (
+
+            {loading && !refreshing ? (
 				<View style={styles.loadingContainer}>
 					<ActivityIndicator size="large" color="#4CAF50" />
 				</View>
 			) : (
-				<ScrollView contentContainerStyle={styles.scrollContainer} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#4CAF50"]} />}>
-					{marketItems.length === 0 ? (
+				<ScrollView
+                    contentContainerStyle={styles.scrollContainer}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            colors={["#4CAF50"]}
+                            tintColor={"#4CAF50"} 
+                        />
+                    }
+                >
+					{filteredMarketItems.length === 0 && !loading ? (
 						<View style={styles.emptyContainer}>
-							<Text style={styles.emptyText}>No items available in the marketplace</Text>
+							<Text style={styles.emptyText}>
+                                {viewMode === 'player'
+                                    ? "No items available from other players right now."
+                                    : "No system items available for purchase right now."}
+                            </Text>
 						</View>
 					) : (
 						<View style={[styles.itemsContainer, { maxWidth: screenWidth - ITEM_MARGIN * 2 }]}>
-							{marketItems.map((item) => (
+							{filteredMarketItems.map((item) => (
 								<View key={item.id} style={[styles.marketItem, { width: itemWidth, margin: ITEM_MARGIN / 2 }]}>
-									<MarketItem id={item.id} imageUrl={item.image_url} price={item.hidden_value} title={item.name} description={item.description} onPurchaseComplete={handlePurchaseComplete} />
+									<MarketItem
+                                        id={item.id}
+                                        imageUrl={item.image_url}
+                                        price={item.hidden_value}
+                                        title={item.name}
+                                        description={item.description}
+                                        ownerFirebaseUid={item.ownerFirebaseUid} 
+                                        onPurchaseComplete={handlePurchaseComplete} 
+                                    />
 								</View>
 							))}
 						</View>
@@ -114,20 +155,46 @@ export default function Market() {
 const styles = StyleSheet.create({
 	bannerContainer: {
 		width: "100%",
-		backgroundColor: "#4CAF50",
+		backgroundColor: "#4CAF50", 
 		paddingVertical: 15,
 		alignItems: "center",
-		marginBottom: 20,
 	},
 	bannerText: {
 		fontSize: 24,
 		fontWeight: "bold",
 		color: "#fff",
 	},
+    toggleContainer: {
+        flexDirection: 'row', 
+        justifyContent: 'center', 
+        paddingVertical: 10,
+        backgroundColor: '#111', 
+        width: '100%',
+    },
+    toggleButton: {
+        paddingVertical: 8,
+        paddingHorizontal: 15,
+        marginHorizontal: 5,
+        borderRadius: 20, 
+        borderWidth: 1,
+        borderColor: '#4CAF50',
+    },
+    toggleButtonActive: {
+        backgroundColor: '#4CAF50', 
+    },
+    toggleButtonText: {
+        color: '#4CAF50',
+        fontWeight: '600',
+    },
+    toggleButtonTextActive: {
+        color: '#fff', 
+    },
 	scrollContainer: {
 		flexGrow: 1,
 		alignItems: "center",
 		paddingBottom: 20,
+        paddingTop: 20,
+        backgroundColor: '#000',
 	},
 	itemsContainer: {
 		flexDirection: "row",
@@ -135,25 +202,27 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		alignItems: "flex-start",
 		width: "100%",
+        paddingTop: 10,
 	},
 	marketItem: {
-		marginBottom: 20,
+		marginBottom: 10,
 	},
 	loadingContainer: {
 		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
-		paddingTop: 50,
+        backgroundColor: '#000',
 	},
 	emptyContainer: {
 		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
-		paddingTop: 100,
+        minHeight: 200,
+        paddingHorizontal: 20,
 	},
 	emptyText: {
 		fontSize: 18,
-		color: "#666",
+		color: "#888",
 		textAlign: "center",
 	},
 });

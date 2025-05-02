@@ -1,29 +1,62 @@
-//@ts-nocheck
+// @ts-nocheck
 import React, { useState, useEffect } from "react";
-import { View, Text, Image, StyleSheet, Modal, Pressable, Alert, FlatList, TextInput, Dimensions, ActivityIndicator } from "react-native";
+import {
+	View,
+	Text,
+	Image,
+	StyleSheet,
+	Modal,
+	Pressable,
+	Alert,
+	FlatList,
+	TextInput,
+	Dimensions,
+	ActivityIndicator,
+	Platform, 
+} from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import axios from "axios";
 import { auth } from "../utils/firebaseConfig";
+import { useRouter } from "expo-router";
 
-export default function MarketItem({ id, imageUrl, price, title, description, onPurchaseComplete }) {
+const fetchUserInventory = async (token) => {
+	const response = await axios.get(`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/items/user/me`, {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+	return response.data.items || [];
+};
+
+const createTrade = async (token, tradeData) => {
+	const numericTradeData = {
+		item_offered_id: Number(tradeData.item_offered_id),
+		item_requested_id: Number(tradeData.item_requested_id),
+		responder_firebase_uid: tradeData.responder_firebase_uid,
+	};
+	console.log("Sending trade creation request:", numericTradeData);
+	const response = await axios.post(`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/trades/create`, numericTradeData, { headers: { Authorization: `Bearer ${token}` } });
+	return response.data;
+};
+
+export default function MarketItem({ id, imageUrl, price, title, description, ownerFirebaseUid, onPurchaseComplete }) {
 	// States for modals
 	const [infoModalVisible, setInfoModalVisible] = useState(false);
 	const [buyModalVisible, setBuyModalVisible] = useState(false);
 	const [bargainModalVisible, setBargainModalVisible] = useState(false);
 	const [tradeModalVisible, setTradeModalVisible] = useState(false);
 
-	// States for user interactions
 	const [inputPrice, setInputPrice] = useState(price);
 	const [multiplier, setMultiplier] = useState(1);
 	const [chatMessages, setChatMessages] = useState([]);
 	const [message, setMessage] = useState("");
-	const [selectedTradeItem, setSelectedTradeItem] = useState("");
+	const [userInventory, setUserInventory] = useState([]);
+	const [selectedTradeItem, setSelectedTradeItem] = useState(null);
+	const [inventoryLoading, setInventoryLoading] = useState(false);
+	const [inventoryError, setInventoryError] = useState(null);
 
-	// Loading state
-	const [isLoading, setIsLoading] = useState(false);
+	const [isLoading, setIsLoading] = useState(false); 
 
-	// Window size for responsive design
 	const [windowSize, setWindowSize] = useState(Dimensions.get("window"));
+	const router = useRouter();
 
 	useEffect(() => {
 		const subscription = Dimensions.addEventListener("change", ({ window }) => {
@@ -31,9 +64,6 @@ export default function MarketItem({ id, imageUrl, price, title, description, on
 		});
 		return () => subscription?.remove();
 	}, []);
-
-	// Dummy trade options - in a real app, these would come from the user's inventory
-	const tradeOptions = ["bike", "chair", "car", "Mystery Box"];
 
 	const getClampedWidth = (percentage, min, max) => {
 		const calculated = windowSize.width * percentage;
@@ -45,6 +75,34 @@ export default function MarketItem({ id, imageUrl, price, title, description, on
 		setBuyModalVisible(false);
 		setBargainModalVisible(false);
 		setTradeModalVisible(false);
+		setInventoryError(null);
+	};
+
+	const openTradeModal = async () => {
+		if (!ownerFirebaseUid) {
+			Alert.alert("Cannot Trade", "This item does not have an owner and cannot be traded for.");
+			return;
+		}
+		setInventoryLoading(true);
+		setInventoryError(null);
+		setTradeModalVisible(true);
+		try {
+			const user = auth.currentUser;
+			if (!user) throw new Error("User not logged in.");
+			const token = await user.getIdToken();
+			const inventory = await fetchUserInventory(token);
+			setUserInventory(inventory);
+			if (inventory.length > 0) {
+				setSelectedTradeItem(inventory[0].id);
+			} else {
+				setSelectedTradeItem(null);
+			}
+		} catch (error) {
+			console.error("Failed to fetch user inventory:", error);
+			setInventoryError("Could not load your items. Please try again.");
+		} finally {
+			setInventoryLoading(false);
+		}
 	};
 
 	const handleConfirmBuy = async () => {
@@ -57,36 +115,12 @@ export default function MarketItem({ id, imageUrl, price, title, description, on
 				setIsLoading(false);
 				return;
 			}
-
-			console.log(`Frontend auth.currentUser.uid before getting token: ${user.uid}`);
-
-
 			const token = await user.getIdToken();
-
 			console.log(`Sending purchase request: itemId=${id}, offeredPrice=${inputPrice}`);
-
-			// Make API call to purchase the item
-			const response = await axios.post(
-				`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/items/purchase`,
-				{
-					itemId: id,
-					offeredPrice: inputPrice,
-				},
-				{
-					headers: {
-						Authorization: `Bearer ${token}`,
-					},
-				}
-			);
-
-			// Close the modal and show success message
+			const response = await axios.post(`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/items/purchase`, { itemId: id, offeredPrice: inputPrice }, { headers: { Authorization: `Bearer ${token}` } });
 			setBuyModalVisible(false);
 			Alert.alert("Purchase Successful", `You bought ${title} for $${inputPrice.toFixed(2)}`);
-
-			// Notify parent component about the purchase
-			if (onPurchaseComplete) {
-				onPurchaseComplete(id);
-			}
+			if (onPurchaseComplete) onPurchaseComplete(id);
 		} catch (error) {
 			console.error("Error purchasing item:", error);
 			Alert.alert("Purchase Failed", error.response?.data?.error || "There was an error processing your purchase");
@@ -97,33 +131,43 @@ export default function MarketItem({ id, imageUrl, price, title, description, on
 
 	const handleSendMessage = () => {
 		if (message.trim()) {
-			// Add the user's message
-			setChatMessages((msgs) => [
-				...msgs,
-				{
-					text: message.trim(),
-					isUser: true,
-				},
-			]);
-
-			// Simulate a response (in a real app, this would be an API call)
+			setChatMessages((msgs) => [...msgs, { text: message.trim(), isUser: true }]);
 			setTimeout(() => {
-				setChatMessages((msgs) => [
-					...msgs,
-					{
-						text: `I can offer this item for $${(price * 0.9).toFixed(2)}`,
-						isUser: false,
-					},
-				]);
+				setChatMessages((msgs) => [...msgs, { text: `I can offer this item for $${(price * 0.9).toFixed(2)}`, isUser: false }]);
 			}, 1000);
-
 			setMessage("");
 		}
 	};
 
-	const handleConfirmTrade = () => {
-		setTradeModalVisible(false);
-		Alert.alert("Trade Offer Sent", `You offered: ${selectedTradeItem} for ${title}`);
+	const handleConfirmTrade = async () => {
+		if (!selectedTradeItem) {
+			Alert.alert("No Item Selected", "Please select an item from your inventory to offer.");
+			return;
+		}
+		if (!ownerFirebaseUid) {
+			Alert.alert("Error", "Cannot determine the owner of the requested item.");
+			console.error("ownerFirebaseUid is missing in MarketItem props for item ID:", id);
+			return;
+		}
+		setIsLoading(true);
+		try {
+			const user = auth.currentUser;
+			if (!user) throw new Error("User not logged in.");
+			const token = await user.getIdToken();
+			const tradeData = {
+				item_offered_id: selectedTradeItem,
+				item_requested_id: id,
+				responder_firebase_uid: ownerFirebaseUid,
+			};
+			await createTrade(token, tradeData);
+			setTradeModalVisible(false);
+			Alert.alert("Trade Offer Sent", `Your offer to trade for ${title} has been sent.`);
+		} catch (error) {
+			console.error("Error creating trade:", error);
+			Alert.alert("Trade Failed", error.response?.data?.error || "Could not send trade offer.");
+		} finally {
+			setIsLoading(false);
+		}
 	};
 
 	const incrementPrice = () => setInputPrice((prev) => parseFloat((prev + multiplier).toFixed(2)));
@@ -133,16 +177,20 @@ export default function MarketItem({ id, imageUrl, price, title, description, on
 
 	return (
 		<View style={styles.card}>
-			<Image source={{ uri: imageUrl }} style={styles.image} />
-			<Text style={styles.title}>{title}</Text>
-			<Text style={styles.value}>${price.toFixed(2)}</Text>
-			<Text style={styles.description}>{description}</Text>
+			<Image source={{ uri: imageUrl || "https://placehold.co/200x150/222/ccc?text=No+Image" }} style={styles.image} resizeMode="cover" />
+			<View style={styles.textContainer}>
+				<Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
+					{title || "No Title"}
+				</Text>
+				<Text style={styles.value}>${price?.toFixed(2) || "0.00"}</Text>
+				<Text style={styles.description} numberOfLines={2} ellipsizeMode="tail">
+					{description || "No description available."}
+				</Text>
+			</View>
 
-			<View style={{ height: 20 }} />
-
-			<View style={styles.infoRow}>
+			<View style={styles.buttonContainer}>
 				<Pressable
-					style={[styles.button, styles.buyButton]}
+					style={({ pressed }) => [styles.button, styles.buyButton, pressed && styles.buttonPressedBuy]}
 					onPress={() => {
 						setInputPrice(price);
 						setBuyModalVisible(true);
@@ -151,51 +199,36 @@ export default function MarketItem({ id, imageUrl, price, title, description, on
 					<Text style={styles.buttonText}>Buy</Text>
 				</Pressable>
 
-				<View>
-					<Pressable style={[styles.button, styles.bargainButton]} onPress={() => setBargainModalVisible(true)}>
-						<Text style={styles.buttonText}>Bargain</Text>
-					</Pressable>
-					<Pressable
-						style={[styles.button, styles.tradeButton]}
-						onPress={() => {
-							setSelectedTradeItem(tradeOptions[0]);
-							setTradeModalVisible(true);
-						}}
-					>
-						<Text style={styles.buttonText}>Trade</Text>
-					</Pressable>
-				</View>
+				{ownerFirebaseUid && (
+					<View style={styles.actionButtonsContainer}>
+						<Pressable style={({ pressed }) => [styles.button, styles.bargainButton, pressed && styles.buttonPressedBargain]} onPress={() => setBargainModalVisible(true)}>
+							<Text style={styles.buttonText}>Bargain</Text>
+						</Pressable>
+						<Pressable style={({ pressed }) => [styles.button, styles.tradeButton, pressed && styles.buttonPressedTrade]} onPress={openTradeModal}>
+							<Text style={styles.buttonText}>Trade</Text>
+						</Pressable>
+					</View>
+				)}
 			</View>
 
-			{/* Buy Modal */}
 			<Modal animationType="fade" transparent visible={buyModalVisible} onRequestClose={closeAll}>
 				<View style={styles.modalOverlay}>
-					<View
-						style={[
-							styles.modalView,
-							{
-								width: getClampedWidth(0.8, 300, 500),
-								height: windowSize.height * 0.4,
-							},
-						]}
-					>
-						<Pressable style={styles.topRightX} onPress={closeAll}>
-							<Text style={styles.xText}>×</Text>
+					<View style={[styles.modalView, { width: getClampedWidth(0.85, 300, 500), minHeight: windowSize.height * 0.45 }]}>
+						<Pressable style={styles.closeButton} onPress={closeAll}>
+							<Text style={styles.closeButtonText}>×</Text>
 						</Pressable>
 						<Text style={styles.modalTitle}>Purchase {title}</Text>
-
-						<Text style={styles.label}>Price</Text>
+						<Text style={styles.label}>Set Your Price:</Text>
 						<View style={styles.stepperContainer}>
 							<Pressable style={styles.stepperButton} onPress={decrementPrice}>
 								<Text style={styles.stepperText}>-</Text>
 							</Pressable>
-							<Text style={styles.priceText}>${inputPrice.toFixed(2)}</Text>
+							<Text style={styles.priceText}>${inputPrice?.toFixed(2)}</Text>
 							<Pressable style={styles.stepperButton} onPress={incrementPrice}>
 								<Text style={styles.stepperText}>+</Text>
 							</Pressable>
 						</View>
-
-						<Text style={styles.label}>Adjust By</Text>
+						<Text style={styles.label}>Adjust By:</Text>
 						<View style={styles.stepperContainer}>
 							<Pressable style={styles.stepperButton} onPress={decrementMultiplier}>
 								<Text style={styles.stepperText}>-</Text>
@@ -205,8 +238,7 @@ export default function MarketItem({ id, imageUrl, price, title, description, on
 								<Text style={styles.stepperText}>+</Text>
 							</Pressable>
 						</View>
-
-						<Pressable style={[styles.confirmButton, isLoading && styles.buttonDisabled]} onPress={handleConfirmBuy} disabled={isLoading}>
+						<Pressable style={({ pressed }) => [styles.confirmButton, isLoading && styles.buttonDisabled, pressed && styles.buttonPressedConfirm]} onPress={handleConfirmBuy} disabled={isLoading}>
 							{isLoading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.buttonText}>Confirm Purchase</Text>}
 						</Pressable>
 					</View>
@@ -216,20 +248,11 @@ export default function MarketItem({ id, imageUrl, price, title, description, on
 			{/* Bargain Modal */}
 			<Modal animationType="fade" transparent visible={bargainModalVisible} onRequestClose={closeAll}>
 				<View style={styles.modalOverlay}>
-					<View
-						style={[
-							styles.modalView,
-							{
-								width: getClampedWidth(0.8, 320, 600),
-								height: windowSize.height * 0.6,
-							},
-						]}
-					>
-						<Pressable style={styles.topRightX} onPress={closeAll}>
-							<Text style={styles.xText}>×</Text>
+					<View style={[styles.modalView, { width: getClampedWidth(0.9, 320, 600), height: windowSize.height * 0.7 }]}>
+						<Pressable style={styles.closeButton} onPress={closeAll}>
+							<Text style={styles.closeButtonText}>×</Text>
 						</Pressable>
 						<Text style={styles.modalTitle}>Bargain with Seller</Text>
-
 						<FlatList
 							data={chatMessages}
 							renderItem={({ item }) => (
@@ -239,8 +262,8 @@ export default function MarketItem({ id, imageUrl, price, title, description, on
 							)}
 							keyExtractor={(_, idx) => idx.toString()}
 							style={styles.chatWindow}
+							contentContainerStyle={{ paddingBottom: 10 }}
 						/>
-
 						<View style={styles.messageInputContainer}>
 							<TextInput style={styles.chatInput} value={message} onChangeText={setMessage} placeholder="Make an offer..." placeholderTextColor="#999" />
 							<Pressable style={styles.sendButton} onPress={handleSendMessage}>
@@ -251,33 +274,35 @@ export default function MarketItem({ id, imageUrl, price, title, description, on
 				</View>
 			</Modal>
 
-			{/* Trade Modal */}
 			<Modal animationType="fade" transparent visible={tradeModalVisible} onRequestClose={closeAll}>
 				<View style={styles.modalOverlay}>
-					<View
-						style={[
-							styles.modalView,
-							{
-								width: getClampedWidth(0.8, 320, 600),
-								height: windowSize.height * 0.4,
-							},
-						]}
-					>
-						<Pressable style={styles.topRightX} onPress={closeAll}>
-							<Text style={styles.xText}>×</Text>
+					<View style={[styles.modalView, { width: getClampedWidth(0.85, 320, 600), minHeight: windowSize.height * 0.45 }]}>
+						<Pressable style={styles.closeButton} onPress={closeAll}>
+							<Text style={styles.closeButtonText}>×</Text>
 						</Pressable>
-						<Text style={styles.modalTitle}>Trade</Text>
-						<Text style={styles.label}>Offer an item to trade:</Text>
-						<View style={styles.pickerContainer}>
-							<Picker selectedValue={selectedTradeItem} onValueChange={(itemValue) => setSelectedTradeItem(itemValue)} style={styles.picker}>
-								{tradeOptions.map((item) => (
-									<Picker.Item key={item} label={item} value={item} />
-								))}
-							</Picker>
-						</View>
-						<Pressable style={styles.confirmButton} onPress={handleConfirmTrade}>
-							<Text style={styles.buttonText}>Send Trade</Text>
-						</Pressable>
+						<Text style={styles.modalTitle}>Offer Trade for {title}</Text>
+
+						{inventoryLoading ? (
+							<ActivityIndicator size="large" color="#4CAF50" style={{ marginVertical: 20 }} />
+						) : inventoryError ? (
+							<Text style={styles.errorText}>{inventoryError}</Text>
+						) : userInventory.length === 0 ? (
+							<Text style={styles.emptyInventoryText}>You have no items in your inventory to trade.</Text>
+						) : (
+							<>
+								<Text style={styles.label}>Select item to offer:</Text>
+								<View style={styles.pickerContainer}>
+									<Picker selectedValue={selectedTradeItem} onValueChange={(itemValue) => setSelectedTradeItem(itemValue)} style={styles.picker} itemStyle={styles.pickerItem}>
+										{userInventory.map((item) => (
+											<Picker.Item key={item.id} label={`${item.name || "Unnamed Item"} (Value: ${item.hidden_value || "?"})`} value={item.id} />
+										))}
+									</Picker>
+								</View>
+								<Pressable style={({ pressed }) => [styles.confirmButton, (isLoading || !selectedTradeItem) && styles.buttonDisabled, pressed && styles.buttonPressedConfirm]} onPress={handleConfirmTrade} disabled={isLoading || !selectedTradeItem}>
+									{isLoading ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.buttonText}>Send Trade Offer</Text>}
+								</Pressable>
+							</>
+						)}
 					</View>
 				</View>
 			</Modal>
@@ -287,201 +312,302 @@ export default function MarketItem({ id, imageUrl, price, title, description, on
 
 const styles = StyleSheet.create({
 	card: {
-		backgroundColor: "#fff",
-		borderRadius: 10,
-		padding: 16,
-		shadowColor: "#000",
-		shadowOpacity: 0.1,
-		shadowRadius: 5,
+		backgroundColor: "#222",
+		borderRadius: 8,
+		shadowColor: "#0f0",
+		shadowOpacity: 0.2,
+		shadowRadius: 6,
 		shadowOffset: { width: 0, height: 3 },
-		marginBottom: 20,
+		marginBottom: 15,
 		alignItems: "center",
+		width: "100%",
+		overflow: "hidden",
+		elevation: 4,
 	},
 	image: {
 		width: "100%",
-		height: 150,
-		borderRadius: 8,
-		marginBottom: 12,
+		aspectRatio: 16 / 10,
+		backgroundColor: "#333",
+	},
+	textContainer: {
+		paddingVertical: 10,
+		paddingHorizontal: 12,
+		width: "100%",
+		alignItems: "center",
 	},
 	title: {
-		fontSize: 18,
-		fontWeight: "bold",
-		color: "#333",
-		marginBottom: 6,
-	},
-	value: {
-		fontSize: 16,
-		fontWeight: "bold",
-		color: "#4CAF50",
-	},
-	description: {
-		fontSize: 14,
-		color: "#777",
-		marginVertical: 10,
+		fontSize: 15,
+		fontWeight: "600",
+		color: "#E8E8E8",
+		marginBottom: 3,
 		textAlign: "center",
 	},
-	infoRow: {
+	value: {
+		fontSize: 14,
+		fontWeight: "bold",
+		color: "#4CAF50",
+		textAlign: "center",
+		marginBottom: 5,
+	},
+	description: {
+		fontSize: 12,
+		color: "#B0B0B0",
+		textAlign: "center",
+		marginBottom: 8,
+	},
+	buttonContainer: {
 		flexDirection: "row",
-		alignItems: "center",
-		justifyContent: "space-between",
 		width: "100%",
-		maxWidth: 600,
-		alignSelf: "center",
 		paddingHorizontal: 10,
-		marginBottom: 20,
+		paddingBottom: 10,
+		paddingTop: 5,
+		borderTopWidth: 1,
+		borderTopColor: "#333",
 	},
 	button: {
-		marginTop: 10,
-		backgroundColor: "#4CAF50",
-		paddingVertical: 8,
-		paddingHorizontal: 16,
-		borderRadius: 5,
-	},
-	buyButton: {
-		backgroundColor: "#28ff00",
-		width: 80,
-		height: 80,
-		borderRadius: 40,
-		justifyContent: "center",
+		paddingVertical: 6,
+		paddingHorizontal: 10,
+		borderRadius: 6,
 		alignItems: "center",
-	},
-	bargainButton: {
-		backgroundColor: "#00d9ff",
-		marginBottom: 10,
-	},
-	tradeButton: {
-		backgroundColor: "#ff0013",
+		justifyContent: "center",
+		minHeight: 32,
+		elevation: 1,
+		shadowOpacity: 0.15,
+		shadowRadius: 1,
 	},
 	buttonText: {
 		color: "#fff",
-		fontWeight: "bold",
+		fontWeight: "600",
+		fontSize: 12,
+		textAlign: "center",
+	},
+	buyButton: {
+		backgroundColor: "#2E7D32",
+		flexGrow: 1,
+		marginRight: 4,
+	},
+	buttonPressedBuy: {
+		backgroundColor: "#1B5E20",
+	},
+	actionButtonsContainer: {
+		flexDirection: "column",
+		marginLeft: 4,
+		flexShrink: 0,
+		width: "38%",
+	},
+	bargainButton: {
+		backgroundColor: "#0277BD",
+		marginBottom: 4,
+	},
+	buttonPressedBargain: {
+		backgroundColor: "#01579B",
+	},
+	tradeButton: {
+		backgroundColor: "#C62828",
+	},
+	buttonPressedTrade: {
+		backgroundColor: "#B71C1C",
 	},
 	buttonDisabled: {
-		opacity: 0.7,
+		opacity: 0.6,
+		backgroundColor: "#424242",
 	},
 	modalOverlay: {
 		flex: 1,
 		justifyContent: "center",
 		alignItems: "center",
-		backgroundColor: "rgba(0,0,0,0.5)",
+		backgroundColor: "rgba(0,0,0,0.7)",
 	},
 	modalView: {
-		backgroundColor: "#fff",
-		borderRadius: 10,
+		backgroundColor: "#f0f0f0",
+		borderRadius: 15,
 		padding: 20,
 		alignItems: "center",
 		position: "relative",
 		elevation: 5,
+		shadowColor: "#000",
+		shadowOffset: { width: 0, height: 3 },
+		shadowOpacity: 0.3,
+		shadowRadius: 5,
+		borderWidth: 1,
+		borderColor: "#ccc",
 	},
-	topRightX: {
+	closeButton: {
 		position: "absolute",
-		top: 10,
-		right: 10,
-		padding: 10,
+		top: 8,
+		right: 8,
+		backgroundColor: "#e0e0e0",
+		borderRadius: 15,
+		width: 30,
+		height: 30,
+		justifyContent: "center",
+		alignItems: "center",
+		zIndex: 1,
+		elevation: 6,
 	},
-	xText: {
-		fontSize: 24,
-		color: "#000",
+	closeButtonText: {
+		fontSize: 18,
+		color: "#333",
 		fontWeight: "bold",
+		lineHeight: 20,
 	},
 	modalTitle: {
 		fontSize: 20,
 		fontWeight: "bold",
 		marginBottom: 20,
-		marginTop: 10,
+		marginTop: 15,
+		color: "#333",
+		textAlign: "center",
 	},
 	label: {
-		marginTop: 10,
-		fontWeight: "bold",
-		fontSize: 16,
+		marginTop: 15,
+		fontWeight: "600",
+		fontSize: 15,
+		color: "#555",
+		alignSelf: "flex-start",
+		marginLeft: "5%",
+		marginBottom: 5,
 	},
 	stepperContainer: {
 		flexDirection: "row",
 		alignItems: "center",
-		justifyContent: "center",
-		marginVertical: 10,
+		justifyContent: "space-between",
+		marginVertical: 8,
+		width: "90%",
+		backgroundColor: "#fff",
+		padding: 8,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: "#ddd",
 	},
 	stepperButton: {
-		backgroundColor: "#eee",
-		padding: 10,
+		backgroundColor: "#e0e0e0",
+		paddingVertical: 8,
+		paddingHorizontal: 12,
 		borderRadius: 5,
-		marginHorizontal: 15,
-		width: 40,
+		minWidth: 40,
 		alignItems: "center",
 	},
 	stepperText: {
 		fontSize: 18,
 		fontWeight: "bold",
+		color: "#333",
 	},
 	priceText: {
-		fontSize: 20,
-		fontWeight: "bold",
-		width: 100,
+		fontSize: 18,
+		fontWeight: "600",
+		color: "#000",
+		minWidth: 80,
 		textAlign: "center",
 	},
 	confirmButton: {
-		position: "absolute",
-		bottom: 20,
-		right: 20,
+		marginTop: 25,
+		alignSelf: "center",
 		backgroundColor: "#4CAF50",
-		paddingVertical: 10,
-		paddingHorizontal: 20,
-		borderRadius: 5,
-		minWidth: 150,
+		paddingVertical: 12,
+		paddingHorizontal: 30,
+		borderRadius: 8,
+		minWidth: 180,
 		alignItems: "center",
+		elevation: 2,
+	},
+	buttonPressedConfirm: {
+		backgroundColor: "#388E3C",
 	},
 	pickerContainer: {
 		borderWidth: 1,
 		borderColor: "#ccc",
-		borderRadius: 5,
-		marginTop: 10,
-		width: "100%",
-		marginBottom: 30,
+		borderRadius: 8,
+		marginTop: 5,
+		width: "90%",
+		marginBottom: 25,
+		backgroundColor: "#fff",
+		overflow: "hidden",
 	},
 	picker: {
 		width: "100%",
-		height: 50,
+		height: Platform.OS === "ios" ? 180 : 50,
+		color: "#000",
+	},
+	pickerItem: {
+		color: "#000",
+		fontSize: 16,
+		height: Platform.OS === "ios" ? 180 : undefined,
 	},
 	chatWindow: {
 		width: "100%",
-		height: "60%",
+		flex: 1,
 		marginVertical: 15,
+		borderWidth: 1,
+		borderColor: "#ddd",
+		borderRadius: 8,
+		backgroundColor: "#fff",
+		padding: 10,
 	},
 	chatBubble: {
-		padding: 10,
-		borderRadius: 10,
-		marginVertical: 5,
+		paddingVertical: 8,
+		paddingHorizontal: 12,
+		borderRadius: 15,
+		marginVertical: 4,
 		maxWidth: "80%",
+		elevation: 1,
 	},
 	userBubble: {
-		backgroundColor: "#E3F2FD",
+		backgroundColor: "#d1e7ff",
 		alignSelf: "flex-end",
+		borderBottomRightRadius: 5,
 	},
 	sellerBubble: {
-		backgroundColor: "#F1F1F1",
+		backgroundColor: "#f1f1f1",
 		alignSelf: "flex-start",
+		borderBottomLeftRadius: 5,
 	},
 	chatText: {
 		fontSize: 14,
+		color: "#333",
 	},
 	messageInputContainer: {
 		flexDirection: "row",
 		width: "100%",
 		marginTop: 10,
+		paddingHorizontal: 10,
+		alignItems: "center",
+		borderTopWidth: 1,
+		borderTopColor: "#eee",
+		paddingTop: 10,
 	},
 	chatInput: {
 		flex: 1,
 		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 5,
-		padding: 10,
+		borderColor: "#ccc",
+		borderRadius: 20,
+		paddingVertical: 8,
+		paddingHorizontal: 15,
 		marginRight: 10,
+		backgroundColor: "#fff",
+		height: 40,
 	},
 	sendButton: {
 		backgroundColor: "#4CAF50",
 		paddingVertical: 10,
 		paddingHorizontal: 15,
-		borderRadius: 5,
+		borderRadius: 20,
 		justifyContent: "center",
+		height: 40,
+	},
+	errorText: {
+		color: "#D32F2F",
+		marginTop: 15,
+		textAlign: "center",
+		paddingHorizontal: 10,
+		fontSize: 14,
+		fontWeight: "500",
+	},
+	emptyInventoryText: {
+		color: "#666",
+		marginTop: 20,
+		textAlign: "center",
+		fontSize: 15,
+		paddingHorizontal: 10,
 	},
 });
