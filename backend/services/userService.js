@@ -1,58 +1,69 @@
-const pool = require("../db/pool");
+const pool = require("../db/pool").promise();
 
-/**
- * Finds a user by Firebase UID or creates them if not found.
- * @param {Object} firebaseUser - Contains uid, email, and name
- * @returns {Object} User record from DB
- */
 async function findOrCreateUser(firebaseUser) {
 	const { uid, email, name } = firebaseUser;
-
-	return new Promise((resolve, reject) => {
-		pool.query("SELECT * FROM users WHERE firebase_uid = ?", [uid], (err, rows) => {
-			if (err) return reject(err);
-
-			if (rows.length > 0) {
-				return resolve(rows[0]);
-			}
-
-			// Create new user
-			pool.query("INSERT INTO users (username, email, trade_credit, firebase_uid) VALUES (?, ?, ?, ?)", [name, email, 0, uid], (err) => {
-				if (err) return reject(err);
-
-				resolve({
-					username: name,
-					email,
-					trade_credit: 0,
-					firebase_uid: uid,
-				});
-			});
-		});
-	});
+	console.log(`[findOrCreateUser] Finding or creating user for UID: ${uid}, Email: ${email}`);
+	try {
+		const [existingRows] = await pool.query("SELECT * FROM users WHERE firebase_uid = ?", [uid]);
+		if (existingRows.length > 0) {
+			console.log(`[findOrCreateUser] Found existing user: ID ${existingRows[0].id}`);
+			return existingRows[0];
+		}
+		console.log(`[findOrCreateUser] No existing user found. Creating new user...`);
+		const [insertResult] = await pool.query("INSERT INTO users (username, email, trade_credit, firebase_uid) VALUES (?, ?, ?, ?)", [name || `User_${uid.substring(0, 5)}`, email, 0, uid]);
+		console.log(`[findOrCreateUser] New user created with ID: ${insertResult.insertId}`);
+		const [newRows] = await pool.query("SELECT * FROM users WHERE id = ?", [insertResult.insertId]);
+		return newRows[0];
+	} catch (err) {
+		console.error(`[findOrCreateUser] Error finding or creating user for UID ${uid}:`, err);
+		return null;
+	}
 }
 
 /**
  * Updates a user's trade credit by amount (+/-)
- * @param {string} userId - User ID
+ * @param {number} userId - Internal User ID
  * @param {number} delta - Amount to add/subtract
- * @returns {number} New credit balance
+ * @param {object} [db=pool] - Optional DB connection or pool to use (this defaults to pool (mentioning because it caused me problems))
+ * @returns {Promise<number | null>} New credit balance or null on failure
  */
-async function updateTradeCredit(userId, delta) {
-	return new Promise((resolve, reject) => {
-		pool.query("UPDATE users SET trade_credit = trade_credit + ? WHERE id = ?", [delta, userId], (err) => {
-			if (err) return reject(err);
+async function updateTradeCredit(userId, delta, db = pool) {
+	console.log(`[updateTradeCredit] Attempting to update credit for user ${userId} by ${delta}`);
+	if (typeof userId !== "number" || isNaN(userId) || userId <= 0) {
+		console.error(`[updateTradeCredit] Invalid userId: ${userId}`);
+		return null;
+	}
+	if (typeof delta !== "number" || isNaN(delta)) {
+		console.error(`[updateTradeCredit] Invalid delta: ${delta}`);
+		return null;
+	}
 
-			pool.query("SELECT trade_credit FROM users WHERE id = ?", [userId], (err, rows) => {
-				if (err) return reject(err);
-				resolve(rows[0]?.trade_credit ?? null);
-			});
-		});
-	});
+	try {
+		const updateSql = "UPDATE users SET trade_credit = trade_credit + ? WHERE id = ?";
+		const [updateResult] = await db.query(updateSql, [delta, userId]);
+		console.log(`[updateTradeCredit] Update result for user ${userId}:`, updateResult);
+
+		if (updateResult.affectedRows === 0) {
+			console.warn(`[updateTradeCredit] Update affected 0 rows for user ${userId}. User might not exist.`);
+			return null;
+		}
+
+		const [selectResult] = await db.query("SELECT trade_credit FROM users WHERE id = ?", [userId]);
+
+		if (selectResult.length > 0) {
+			const newBalance = selectResult[0].trade_credit;
+			console.log(`[updateTradeCredit] Successfully updated credit for user ${userId}. New balance: ${newBalance}`);
+			return newBalance;
+		} else {
+			console.error(`[updateTradeCredit] Could not fetch new balance for user ${userId} after successful update.`);
+			return null;
+		}
+	} catch (err) {
+		console.error(`[updateTradeCredit] Error updating credit for user ${userId}:`, err);
+		throw err;
+	}
 }
 
-/**
- * Sets a user's trade credit to an exact value for testing purposes
- */
 async function setTradeCredit(userId, newAmount) {
 	return new Promise((resolve, reject) => {
 		pool.query("UPDATE users SET trade_credit = ? WHERE id = ?", [newAmount, userId], (err) => {
