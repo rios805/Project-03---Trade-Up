@@ -6,6 +6,7 @@ const itemRoutes = require("./routes/items"); //Using item routes
 const tradeRoutes = require("./routes/trades"); // Using trade routes
 const challengeRoutes = require("./routes/challenges"); // Using challenge routes
 const scoreRoutes = require("./routes/scores"); //Using score routes
+const reactionGameRoutes = require("./routes/reactionGame"); //Using reaction game routes
 require("dotenv").config(); //to load up env variables
 
 const app = express();
@@ -21,6 +22,7 @@ app.use("/api/items", itemRoutes);
 app.use("/api/trades", tradeRoutes); 
 app.use("/api/challenges", challengeRoutes);
 app.use("/api/scores", scoreRoutes);
+app.use("/api/reaction-game", reactionGameRoutes);
 
 
 // Testing DB connection
