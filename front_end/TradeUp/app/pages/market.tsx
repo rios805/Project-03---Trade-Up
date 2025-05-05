@@ -1,181 +1,228 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, Image, ScrollView, useWindowDimensions } from 'react-native';
-import StarRating from '../../components/StarRating';
-import MarketItem from '../../components/MarketItem';
+//@ts-nocheck
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions, ActivityIndicator, Alert, RefreshControl, Pressable } from "react-native";
+import MarketItem from "../../components/MarketItem"; 
+import axios from "axios";
+import { auth } from "../../utils/firebaseConfig";
 
-const images = {
-    noStar: require('../../assets/images/noStars.png'),
-    oneStar: require('../../assets/images/oneStars.png'),
-    twoStar: require('../../assets/images/twoStars.png'),
-    threeStar: require('../../assets/images/threeStars.png'),
-    fourStar: require('../../assets/images/fourStars.png'),
-    fiveStar: require('../../assets/images/fiveStars.png'),
-}
+export default function Market() {
+	const [allItems, setAllItems] = useState([]); 
+    const [viewMode, setViewMode] = useState('player'); 
+	const [loading, setLoading] = useState(true);
+	const [refreshing, setRefreshing] = useState(false);
+	const { width: screenWidth } = useWindowDimensions();
+	const ITEM_MARGIN = 10; 
+    const currentUserUid = auth.currentUser?.uid;
+
+	// This I left because in theory it should help for different size screens.
+	let columns = 5;
+	if (screenWidth < 600) { columns = 2; }
+    else if (screenWidth < 900) { columns = 3; }
+	const itemWidth = (screenWidth - ITEM_MARGIN * (columns + 1)) / columns;
+
+	const fetchMarketItems = useCallback(async () => {
+		console.log("[Market] Starting fetchMarketItems...");
+        if (!refreshing) setLoading(true);
+		try {
+			const user = auth.currentUser;
+			if (!user) {
+       
+                Alert.alert("Not logged in", "Please log in to view market items.");
+                setLoading(false); setRefreshing(false);
+                return;
+            }
+			const token = await user.getIdToken();
+			console.log("[Market] Got ID token");
+			const response = await axios.get(`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/items/marketplace`, {
+				headers: { Authorization: `Bearer ${token}` },
+			});
+			console.log("[Market] Got all market items:", response.data.length);
+			setAllItems(response.data || []); // Stores the raw list
+		} catch (error) {
+            console.error("Failed to fetch market items:", error);
+			Alert.alert("Error", "Failed to load market items.");
+            setAllItems([]); // Clear items on error
+        }
+        finally { setLoading(false); setRefreshing(false); }
+	}, [refreshing]); 
+
+	const onRefresh = useCallback(() => {
+		setRefreshing(true);
+		fetchMarketItems();
+	}, [fetchMarketItems]);
+
+	useEffect(() => {
+		console.log("[Market] useEffect running...");
+		fetchMarketItems();
+	}, [fetchMarketItems]);
 
 
-export default function Profile() {
-    const [rating, setRating] = useState(3.5);
-    const imageUrl = 'https://cdn.pixabay.com/photo/2015/10/05/22/37/blank-profile-picture-973460_1280.png';
-    const accountBalance = 1200.50;
-    const { width: screenWidth } = useWindowDimensions();
+    const filteredMarketItems = useMemo(() => {
+        if (viewMode === 'player') {
+            // Show items owned by OTHERS (This is the default view)
+            const playerItems = allItems.filter(item =>
+                item.ownerFirebaseUid !== null && // Must have an owner
+                item.ownerFirebaseUid !== currentUserUid // Owner must not be the current user
+            );
+            console.log(`[Market] Filtering for 'player' view: ${playerItems.length} items shown.`);
+            return playerItems;
+        } else { 
+            const systemItems = allItems.filter(item => item.ownerFirebaseUid === null);
+            console.log(`[Market] Filtering for 'system' view: ${systemItems.length} items shown.`);
+            return systemItems;
+        }
+    }, [allItems, viewMode, currentUserUid]); 
 
-    const ITEM_MARGIN = 10;
 
-    // Calculate how many items fit per row based on screen width
-    let columns = 5;
-    if (screenWidth < 600) {
-        columns = 2; // For small screens, show 2 items per row
-    } else if (screenWidth < 900) {
-        columns = 3; // For medium screens, show 3 items per row
-    }
+	const handlePurchaseComplete = (purchasedItemId) => {
+        console.log(`[Market] Item ${purchasedItemId} purchased, removing from allItems list.`);
+        setAllItems((prevItems) => prevItems.filter((item) => item.id !== purchasedItemId));
+	};
 
-    const itemWidth = (screenWidth - ITEM_MARGIN * (columns + 1)) / columns;
-
-    const userItems = [
-        { imageUrl: "https://cdn.pixabay.com/photo/2018/03/30/16/58/cactus-3275859_960_720.jpg", value: "99.99", title: "cactus" },
-        { imageUrl: "https://example.com/another-image.jpg", value: "49.99", title: "Another Item" },
-        { imageUrl: "https://example.com/image.jpg", value: "99.99", title: "Sample Item" },
-        { imageUrl: "https://example.com/another-image.jpg", value: "49.99", title: "Another Item" },
-        { imageUrl: "https://example.com/image.jpg", value: "99.99", title: "Sample Item" },
-        { imageUrl: "https://example.com/another-image.jpg", value: "49.99", title: "Another Item" },
-        { imageUrl: "https://example.com/image.jpg", value: "99.99", title: "Sample Item" },
-        { imageUrl: "https://example.com/another-image.jpg", value: "49.99", title: "Another Item" },
-    ];
-
-    return (
-        <>
-            {/* Banner */}
-            <View style={styles.bannerContainer}>
-                <Text style={styles.bannerText}>Market</Text>
+	return (
+		// Using a Fragment <>...</> as the top-level element (This is to allow the return of multple elements)
+		<>
+			<View style={styles.bannerContainer}>
+				<Text style={styles.bannerText}>Marketplace</Text>
+			</View>
+            <View style={styles.toggleContainer}>
+                <Pressable
+                    style={[styles.toggleButton, viewMode === 'player' && styles.toggleButtonActive]}
+                    onPress={() => setViewMode('player')}
+                >
+                    <Text style={[styles.toggleButtonText, viewMode === 'player' && styles.toggleButtonTextActive]}>
+                        Player Items (Trade/Buy)
+                    </Text>
+                </Pressable>
+                <Pressable
+                    style={[styles.toggleButton, viewMode === 'system' && styles.toggleButtonActive]}
+                    onPress={() => setViewMode('system')}
+                >
+                     <Text style={[styles.toggleButtonText, viewMode === 'system' && styles.toggleButtonTextActive]}>
+                        System Items (Buy Only)
+                    </Text>
+                </Pressable>
             </View>
 
-            {/* Scrollable user items grid */}
-            <ScrollView contentContainerStyle={styles.scrollContainer}>
-                <View style={[styles.userItemsContainer, { maxWidth: screenWidth - ITEM_MARGIN * 2 }]}>
-                    {userItems.map((item, index) => (
-                        <View key={index} style={[styles.userItem, { width: itemWidth, margin: ITEM_MARGIN / 2 }]}>
-                            <MarketItem
-                                imageUrl={item.imageUrl}
-                                value={item.value}
-                                title={item.title}
-                            />
-                        </View>
-                    ))}
-                </View>
-            </ScrollView>
-        </>
-    );
+
+            {loading && !refreshing ? (
+				<View style={styles.loadingContainer}>
+					<ActivityIndicator size="large" color="#4CAF50" />
+				</View>
+			) : (
+				<ScrollView
+                    contentContainerStyle={styles.scrollContainer}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            colors={["#4CAF50"]}
+                            tintColor={"#4CAF50"} 
+                        />
+                    }
+                >
+					{filteredMarketItems.length === 0 && !loading ? (
+						<View style={styles.emptyContainer}>
+							<Text style={styles.emptyText}>
+                                {viewMode === 'player'
+                                    ? "No items available from other players right now."
+                                    : "No system items available for purchase right now."}
+                            </Text>
+						</View>
+					) : (
+						<View style={[styles.itemsContainer, { maxWidth: screenWidth - ITEM_MARGIN * 2 }]}>
+							{filteredMarketItems.map((item) => (
+								<View key={item.id} style={[styles.marketItem, { width: itemWidth, margin: ITEM_MARGIN / 2 }]}>
+									<MarketItem
+                                        id={item.id}
+                                        imageUrl={item.image_url}
+                                        price={item.hidden_value}
+                                        title={item.name}
+                                        description={item.description}
+                                        ownerFirebaseUid={item.ownerFirebaseUid} 
+                                        onPurchaseComplete={handlePurchaseComplete} 
+                                    />
+								</View>
+							))}
+						</View>
+					)}
+				</ScrollView>
+			)}
+		</>
+	);
 }
 
 const styles = StyleSheet.create({
-    container: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        flex: 1,
-    },
-    image: {
-        width: 100,
-        height: 100,
-        resizeMode: 'contain',
-    },
-    topSection: {
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    text: {
-        fontSize: 24,
-        color: '#4CAF50',
-    },
-    ratingRow: {
-        flexDirection: 'row',
-        alignItems: 'center', // vertically align text and image
-    },
-    infoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-
-        // limit how wide the row can grow
-        width: '100%',
-        maxWidth: 600,          // <-- caps the row at 600px
-        alignSelf: 'center',    // <-- centers that 600px block in the screen
-
-        // optional padding inside that block
-        paddingHorizontal: 5,
-
-        marginBottom: 20,
-    },
-    profileImage: {
-        width: 100,
-        height: 100,
-        borderRadius: 50,
-    },
-    profileContainer: {
-        alignItems: 'center',   // centers children horizontally
-        marginBottom: 20,       // optional spacing
-    },
-    nameText: {
-        marginTop: 8,           // space between image and text
-        fontSize: 18,
-        color: 'black',
-        textAlign: 'center',    // ensures multi-line text would be centered
-    },
-    balanceBox: {
-        // backgroundColor: '#4CAF50',
-        padding: 10,
-        alignItems: 'center',
-        marginHorizontal: 5,
-        minWidth: 120,
-        borderWidth: 1,
-        borderStyle: 'solid',
-        borderColor: 'black',
-    },
-    balanceBoxSub: {
-        // backgroundColor: 'white',
-        borderWidth: 1,
-        borderStyle: 'solid',
-        borderColor: 'black',
-        padding: 10,
-        width: '100%',
-        alignItems: 'center',
-        marginHorizontal: 5,
-        minWidth: 120,
-    },
-    balanceText: {
-        fontSize: 14,
-        color: 'black',
-    },
-    balanceAmount: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: 'green',
-    },
-    bannerContainer: {
-        width: '100%',
-        backgroundColor: '#4CAF50',
+	bannerContainer: {
+		width: "100%",
+		backgroundColor: "#4CAF50", 
+		paddingVertical: 15,
+		alignItems: "center",
+	},
+	bannerText: {
+		fontSize: 24,
+		fontWeight: "bold",
+		color: "#fff",
+	},
+    toggleContainer: {
+        flexDirection: 'row', 
+        justifyContent: 'center', 
         paddingVertical: 10,
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    bannerText: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#fff',
-    },
-    scrollContainer: {
-        flexGrow: 1,
-        alignItems: 'center',
-        paddingBottom: 20,
-    },
-    userItemsContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'center', // Centers the items horizontally
-        alignItems: 'flex-start', // Aligns the items to the top of the container
+        backgroundColor: '#111', 
         width: '100%',
     },
-    userItem: {
-        marginBottom: 20,
+    toggleButton: {
+        paddingVertical: 8,
+        paddingHorizontal: 15,
+        marginHorizontal: 5,
+        borderRadius: 20, 
+        borderWidth: 1,
+        borderColor: '#4CAF50',
     },
+    toggleButtonActive: {
+        backgroundColor: '#4CAF50', 
+    },
+    toggleButtonText: {
+        color: '#4CAF50',
+        fontWeight: '600',
+    },
+    toggleButtonTextActive: {
+        color: '#fff', 
+    },
+	scrollContainer: {
+		flexGrow: 1,
+		alignItems: "center",
+		paddingBottom: 20,
+        paddingTop: 20,
+        backgroundColor: '#000',
+	},
+	itemsContainer: {
+		flexDirection: "row",
+		flexWrap: "wrap",
+		justifyContent: "center",
+		alignItems: "flex-start",
+		width: "100%",
+        paddingTop: 10,
+	},
+	marketItem: {
+		marginBottom: 10,
+	},
+	loadingContainer: {
+		flex: 1,
+		justifyContent: "center",
+		alignItems: "center",
+        backgroundColor: '#000',
+	},
+	emptyContainer: {
+		flex: 1,
+		justifyContent: "center",
+		alignItems: "center",
+        minHeight: 200,
+        paddingHorizontal: 20,
+	},
+	emptyText: {
+		fontSize: 18,
+		color: "#888",
+		textAlign: "center",
+	},
 });
-

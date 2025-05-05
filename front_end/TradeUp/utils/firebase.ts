@@ -51,7 +51,6 @@ export const registerUser = async (email: string, password: string, username: st
   }
 };
 
-// Rest of your functions stay the same...
 export const loginUser = async (email: string, password: string) => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);

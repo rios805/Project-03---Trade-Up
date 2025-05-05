@@ -3,6 +3,24 @@ const router = express.Router();
 const authenticate = require("../authMiddleware");
 const { getUserByFirebaseUid, updateUsernameByFirebaseUid, createUser } = require("../db/userQueries");
 const { findOrCreateUser } = require("../services/userService");
+const pool = require("../db/pool").promise();
+
+// GET /api/users/all - Retrieve all users from the database
+router.get("/all",  async (req, res) => {
+	console.log("Received request for GET /api/users/all");
+	try {
+		const sql = `SELECT id, username, email, trade_credit, firebase_uid FROM users`;
+
+		const [rows] = await pool.query(sql);
+
+		console.log(`Found ${rows.length} users.`);
+		res.json(rows);
+	} catch (err) {
+		console.error("Error fetching all users:", err);
+		res.status(500).json({ error: "Failed to fetch users" });
+	}
+});
+
 
 // POST /api/users/me
 router.post("/me", authenticate, async (req, res) => {
