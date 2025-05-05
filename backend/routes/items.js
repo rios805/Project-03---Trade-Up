@@ -347,7 +347,54 @@ router.post("/purchase", authenticate, async (req, res) => {
 	}
 });
 
-// GET /api/items/user/:userId - Get items owned by a specific user
+// POST /api/items/:itemId/cashout
+router.post("/:itemId/cashout", authenticate, async (req, res) => {
+  const connection = await pool.getConnection();
+  try {
+    const itemId = req.params.itemId;
+    const firebaseUid = req.user.uid;
+    const userId = await getUserIdFromFirebaseUid(firebaseUid);
+
+    if (!userId) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    await connection.beginTransaction();
+
+    const [itemRows] = await connection.query("SELECT * FROM items WHERE id = ? FOR UPDATE", [itemId]);
+    const item = itemRows[0];
+    if (!item || item.owner_id !== userId) {
+      await connection.rollback();
+      return res.status(403).json({ error: "You do not own this item" });
+    }
+
+    const itemValue = item.hidden_value;
+
+    // Set item ownership to null (return to system)
+    await connection.query("UPDATE items SET owner_id = NULL WHERE id = ?", [itemId]);
+
+    // Add currency to user
+    await connection.query("UPDATE users SET trade_credit = trade_credit + ? WHERE id = ?", [itemValue, userId]);
+
+    await connection.commit();
+
+    res.json({
+      message: "Item cashed out successfully",
+      itemId,
+      value: itemValue
+    });
+
+  } catch (err) {
+    console.error("Error cashing out item:", err);
+    await connection.rollback();
+    res.status(500).json({ error: "Failed to cash out item" });
+  } finally {
+    connection.release();
+  }
+});
+
+
+// GET /api/items/user/:userId - Get items owned by a specific user 
 router.get("/user/:userId", authenticate, async (req, res) => {
 	try {
 		const userIdParam = req.params.userId;
