@@ -146,6 +146,15 @@ async function updateItemOwner(itemId, newOwnerId) {
   }
 }
 
+async function getSystemItems() {
+  const query = `
+    SELECT i.* FROM items i
+    WHERE i.owner_id IS NULL
+  `;
+  const [rows] = await promisePool.query(query);
+  return rows;
+}
+
 module.exports = {
   getAllItems,
   getItemsByOwner,
@@ -153,4 +162,5 @@ module.exports = {
   getItemByName,
   createItem,
   updateItemOwner,
+  getSystemItems
 };

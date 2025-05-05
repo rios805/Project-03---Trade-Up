@@ -40,8 +40,9 @@ async function finalizeDailyScore(userId) {
 	const finalScore = baseScore + bonusFromChallenge;
 
 	// Earned credit = for every 25% increase from base
-	const earnedFromItems = Math.floor((finalScore - baseScore) / (baseScore * 0.25));
-	const earnedCredit = Math.max(0, earnedFromItems);
+	// Earned currency = 25% of profit (final - base)
+	const profit = finalScore - baseScore;
+	const earnedCredit = Math.max(0, Math.floor(profit * 0.25));
 
 	await pool.query(
 		`UPDATE daily_scores 
