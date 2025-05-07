@@ -36,6 +36,9 @@ export default function ReactionGameScreen() {
   const isMounted = useRef(true);
   const gameStateRef = useRef(gameState);
 
+  const handleGoToLogin = () => { router.push('/pages/login'); };
+  const handleGoToProfile = () => { router.push("/pages/profile"); };
+
   useEffect(() => {
     gameStateRef.current = gameState;
     console.log("[ReactionGame] gameState updated:", gameState);
@@ -99,7 +102,7 @@ export default function ReactionGameScreen() {
         setCurrentAppearDuration(INITIAL_APPEAR_DURATION);
       }
     } catch (err) {
-       if (!isMounted.current) return;
+      if (!isMounted.current) return;
       console.error("[ReactionGame] Error checking status:", err);
       setError(err.response?.data?.error || err.message || "Failed to check game status.");
       setGameState('error');
@@ -108,69 +111,69 @@ export default function ReactionGameScreen() {
         Alert.alert("Session Expired", "Please log in again.", [{ text: "OK", onPress: () => router.replace("/pages/login") }]);
       }
     } finally {
-       if (isMounted.current) setIsCheckingStatus(false);
+      if (isMounted.current) setIsCheckingStatus(false);
     }
   }, [router]);
 
   const saveScoreAndClaimReward = useCallback(async (finalScoreValue) => {
-     if (!isMounted.current) return;
+    if (!isMounted.current) return;
     console.log(`[ReactionGame] Saving score and claiming reward for score: ${finalScoreValue}`);
-    setIsLoading(true); 
+    setIsLoading(true);
 
     try {
-        const user = auth.currentUser;
-        if (!user) throw new Error("User not logged in to claim.");
-        const token = await user.getIdToken(true);
+      const user = auth.currentUser;
+      if (!user) throw new Error("User not logged in to claim.");
+      const token = await user.getIdToken(true);
 
-        const response = await axios.post(
-            `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/reaction-game/claim`,
-            { score: finalScoreValue },
-            { headers: { Authorization: `Bearer ${token}` } }
-        );
+      const response = await axios.post(
+        `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/reaction-game/claim`,
+        { score: finalScoreValue },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-        if (!isMounted.current) return;
+      if (!isMounted.current) return;
 
-        console.log("[ReactionGame] Claim API successful. Response data:", response.data);
-        const receivedReward = response.data?.reward || 0;
+      console.log("[ReactionGame] Claim API successful. Response data:", response.data);
+      const receivedReward = response.data?.reward || 0;
 
-        runOnJS(setReward)(receivedReward);
-        runOnJS(setGameState)('claimed'); 
-        runOnJS(Alert.alert)("Game Over!", response.data?.message || `You scored ${finalScoreValue}!`);
+      runOnJS(setReward)(receivedReward);
+      runOnJS(setGameState)('claimed');
+      runOnJS(Alert.alert)("Game Over!", response.data?.message || `You scored ${finalScoreValue}!`);
 
     } catch (err) {
-         if (!isMounted.current) return;
-        console.error("[ReactionGame] Error claiming reward:", err);
-        const errorMsg = err.response?.data?.error || err.message || "Failed to save score.";
-        runOnJS(setError)(errorMsg);
-        runOnJS(setGameState)('gameover');
-        runOnJS(Alert.alert)("Save Error", errorMsg);
-         if (err.response?.status === 401 || err.response?.status === 403) {
-             runOnJS(Alert.alert)("Session Expired", "Please log in again.", [{ text: "OK", onPress: () => router.replace("/pages/login") }]);
-         }
+      if (!isMounted.current) return;
+      console.error("[ReactionGame] Error claiming reward:", err);
+      const errorMsg = err.response?.data?.error || err.message || "Failed to save score.";
+      runOnJS(setError)(errorMsg);
+      runOnJS(setGameState)('gameover');
+      runOnJS(Alert.alert)("Save Error", errorMsg);
+      if (err.response?.status === 401 || err.response?.status === 403) {
+        runOnJS(Alert.alert)("Session Expired", "Please log in again.", [{ text: "OK", onPress: () => router.replace("/pages/login") }]);
+      }
     } finally {
-        if (isMounted.current) runOnJS(setIsLoading)(false);
+      if (isMounted.current) runOnJS(setIsLoading)(false);
     }
   }, [router]);
 
 
 
   const handleMiss = useCallback(() => {
-      if (!isMounted.current || gameStateRef.current !== 'playing') {
-           console.log(`[ReactionGame] Miss timeout fired but state was not 'playing' (State: ${gameStateRef.current}) or component unmounted.`);
-           return;
-      }
-      console.log("[ReactionGame] Target missed (timeout)!");
-      targetOpacity.value = withTiming(0, { duration: FADE_DURATION });
-      runOnJS(setGameState)('gameover');
-      runOnJS(setFinalScore)(score);
-      runOnJS(saveScoreAndClaimReward)(score);
+    if (!isMounted.current || gameStateRef.current !== 'playing') {
+      console.log(`[ReactionGame] Miss timeout fired but state was not 'playing' (State: ${gameStateRef.current}) or component unmounted.`);
+      return;
+    }
+    console.log("[ReactionGame] Target missed (timeout)!");
+    targetOpacity.value = withTiming(0, { duration: FADE_DURATION });
+    runOnJS(setGameState)('gameover');
+    runOnJS(setFinalScore)(score);
+    runOnJS(saveScoreAndClaimReward)(score);
   }, [saveScoreAndClaimReward, targetOpacity, score]);
 
 
   const spawnTarget = useCallback(() => {
     if (!gameAreaLayout || !isMounted.current || gameStateRef.current !== 'playing') {
-        console.log(`[ReactionGame] spawnTarget called but conditions not met. Mounted: ${isMounted.current}, Layout: ${!!gameAreaLayout}, State: ${gameStateRef.current}`);
-        return;
+      console.log(`[ReactionGame] spawnTarget called but conditions not met. Mounted: ${isMounted.current}, Layout: ${!!gameAreaLayout}, State: ${gameStateRef.current}`);
+      return;
     }
 
     clearTimeout(targetAppearTimeout.current);
@@ -195,8 +198,8 @@ export default function ReactionGameScreen() {
 
   const handleTargetPress = () => {
     if (gameStateRef.current !== 'playing') {
-        console.log("[ReactionGame] Target pressed but not in 'playing' state.");
-        return;
+      console.log("[ReactionGame] Target pressed but not in 'playing' state.");
+      return;
     }
     console.log(`[ReactionGame] Target hit! Score: ${score + 1}`);
 
@@ -213,9 +216,9 @@ export default function ReactionGameScreen() {
       withTiming(1, { duration: SUCCESS_DURATION / 2 })
     );
     targetOpacity.value = withTiming(0, { duration: FADE_DURATION }, (finished) => {
-         if (!finished) {
-              console.log("[ReactionGame] Hit animation cancelled or state changed, not spawning next target from callback.");
-         }
+      if (!finished) {
+        console.log("[ReactionGame] Hit animation cancelled or state changed, not spawning next target from callback.");
+      }
     });
   };
 
@@ -232,44 +235,44 @@ export default function ReactionGameScreen() {
 
   useEffect(() => {
     if (gameState === 'playing' && isMounted.current) {
-        console.log(`[ReactionGame] useEffect[gameState, score]: State is 'playing', score is ${score}. Spawning target.`);
-        spawnTarget();
+      console.log(`[ReactionGame] useEffect[gameState, score]: State is 'playing', score is ${score}. Spawning target.`);
+      spawnTarget();
     }
     return () => {
-        if (gameStateRef.current !== 'playing') {
-            console.log(`[ReactionGame] Cleanup effect for gameState: ${gameStateRef.current}. Clearing timer.`);
-            clearTimeout(targetAppearTimeout.current);
-            targetAppearTimeout.current = null;
-        }
+      if (gameStateRef.current !== 'playing') {
+        console.log(`[ReactionGame] Cleanup effect for gameState: ${gameStateRef.current}. Clearing timer.`);
+        clearTimeout(targetAppearTimeout.current);
+        targetAppearTimeout.current = null;
+      }
     };
   }, [gameState, score, spawnTarget]);
 
   useEffect(() => {
     isMounted.current = true;
     const unsubscribeAuth = auth.onAuthStateChanged(user => {
-        if (!isMounted.current) return;
-        if (user) {
-            console.log("[ReactionGame] Auth state: User logged in. Checking status.");
-            checkGameStatus();
-        } else {
-            console.log("[ReactionGame] Auth state: User logged out.");
-            setGameState('error');
-            setError('Please log in to play the reaction game.');
-            setCanPlay(false);
-            setIsLoading(false);
-             setIsCheckingStatus(false);
-        }
-    });
-
-     if (auth.currentUser) {
+      if (!isMounted.current) return;
+      if (user) {
+        console.log("[ReactionGame] Auth state: User logged in. Checking status.");
         checkGameStatus();
-     } else {
+      } else {
+        console.log("[ReactionGame] Auth state: User logged out.");
         setGameState('error');
         setError('Please log in to play the reaction game.');
         setCanPlay(false);
         setIsLoading(false);
         setIsCheckingStatus(false);
-     }
+      }
+    });
+
+    if (auth.currentUser) {
+      checkGameStatus();
+    } else {
+      setGameState('error');
+      setError('Please log in to play the reaction game.');
+      setCanPlay(false);
+      setIsLoading(false);
+      setIsCheckingStatus(false);
+    }
 
     return () => {
       console.log("[ReactionGame] Component unmounting.");
@@ -286,7 +289,7 @@ export default function ReactionGameScreen() {
 
   const renderGameContent = () => {
     if (isCheckingStatus) {
-         return <ActivityIndicator size="large" color="#4CAF50" />;
+      return <ActivityIndicator size="large" color="#4CAF50" />;
     }
 
     switch (gameState) {
@@ -308,38 +311,38 @@ export default function ReactionGameScreen() {
             <Pressable style={[styles.button, styles.startButton, !gameAreaLayout && styles.buttonDisabled]} onPress={startGame} disabled={!gameAreaLayout || isLoading}>
               <Text style={styles.buttonText}>Start Game</Text>
             </Pressable>
-             {!gameAreaLayout && <Text style={styles.waitText}>(Waiting for layout...)</Text>}
+            {!gameAreaLayout && <Text style={styles.waitText}>(Waiting for layout...)</Text>}
           </>
         );
       case 'playing':
         return <Text style={styles.scoreDisplay}>Score: {score}</Text>;
       case 'gameover':
-         return (
-           <>
-             <Ionicons name="close-circle-outline" size={60} color="#ff6347" style={styles.icon} />
-             <Text style={styles.infoText}>Game Over!</Text>
-             <Text style={styles.finalScoreText}>Final Score: {finalScore}</Text>
-             {isLoading ? (
-                 <ActivityIndicator size="large" color="#4CAF50" style={{marginTop: 20}}/>
-             ) : (
-                 error ? <Text style={styles.errorText}>{error}</Text>
-                 : <Pressable style={styles.button} onPress={() => router.back()}>
-                     <Text style={styles.buttonText}>Back to Profile</Text>
-                 </Pressable>
-             )}
-           </>
-         );
+        return (
+          <>
+            <Ionicons name="close-circle-outline" size={60} color="#ff6347" style={styles.icon} />
+            <Text style={styles.infoText}>Game Over!</Text>
+            <Text style={styles.finalScoreText}>Final Score: {finalScore}</Text>
+            {isLoading ? (
+              <ActivityIndicator size="large" color="#4CAF50" style={{ marginTop: 20 }} />
+            ) : (
+              error ? <Text style={styles.errorText}>{error}</Text>
+                : <Pressable style={styles.button} onPress={() => router.back()}>
+                  <Text style={styles.buttonText}>Back to Profile</Text>
+                </Pressable>
+            )}
+          </>
+        );
       case 'claimed':
         return (
-            <>
-             <Ionicons name="checkmark-circle-outline" size={60} color="#4CAF50" style={styles.icon} />
-             <Text style={styles.infoText}>Played today!</Text>
-             <Text style={styles.finalScoreText}>Score: {finalScore}</Text>
-             <Text style={styles.rewardText}>Reward: {reward} Credits</Text>
-              <Pressable style={[styles.button, styles.buttonDisabled]} disabled={true}>
-                <Text style={styles.buttonText}>Come Back Tomorrow</Text>
+          <>
+            <Ionicons name="checkmark-circle-outline" size={60} color="#4CAF50" style={styles.icon} />
+            <Text style={styles.infoText}>Played today!</Text>
+            <Text style={styles.finalScoreText}>Score: {finalScore}</Text>
+            <Text style={styles.rewardText}>Reward: {reward} Credits</Text>
+            <Pressable style={[styles.button, styles.buttonDisabled]} disabled={true}>
+              <Text style={styles.buttonText}>Come Back Tomorrow</Text>
             </Pressable>
-            </>
+          </>
         );
       default:
         return <ActivityIndicator size="large" color="#4CAF50" />;
@@ -348,30 +351,31 @@ export default function ReactionGameScreen() {
 
   return (
     <View style={styles.container}>
+
       <Text style={styles.title}>Reaction Challenge</Text>
       <View
         style={styles.gameArea}
         onLayout={(event) => {
-          if (!gameAreaLayout || gameAreaLayout.width !== event.nativeEvent.layout.width || gameAreaLayout.height !== event.nativeEvent.layout.height ) {
-             setGameAreaLayout(event.nativeEvent.layout);
-             console.log("[ReactionGame] Game Area Layout Updated:", event.nativeEvent.layout);
+          if (!gameAreaLayout || gameAreaLayout.width !== event.nativeEvent.layout.width || gameAreaLayout.height !== event.nativeEvent.layout.height) {
+            setGameAreaLayout(event.nativeEvent.layout);
+            console.log("[ReactionGame] Game Area Layout Updated:", event.nativeEvent.layout);
           }
         }}
       >
         <AnimatedPressable
-            style={[
-                styles.target,
-                targetAnimatedStyle,
-                gameState !== 'playing' && { opacity: 0 }
-            ]}
-            onPress={handleTargetPress}
-            pointerEvents={gameState === 'playing' ? 'auto' : 'none'}
-            >
+          style={[
+            styles.target,
+            targetAnimatedStyle,
+            gameState !== 'playing' && { opacity: 0 }
+          ]}
+          onPress={handleTargetPress}
+          pointerEvents={gameState === 'playing' ? 'auto' : 'none'}
+        >
           <Ionicons name="flash-outline" size={TARGET_SIZE * 0.6} color="#fff" />
         </AnimatedPressable>
-         <View style={[styles.statusContainer, gameState === 'playing' && styles.statusContainerPlaying]}>
-             {renderGameContent()}
-         </View>
+        <View style={[styles.statusContainer, gameState === 'playing' && styles.statusContainerPlaying]}>
+          {renderGameContent()}
+        </View>
       </View>
       <Pressable style={styles.backButton} onPress={() => router.back()}>
         <Ionicons name="arrow-back-outline" size={24} color="#ccc" />
@@ -420,10 +424,10 @@ const styles = StyleSheet.create({
     borderRadius: 15,
   },
   statusContainerPlaying: {
-     backgroundColor: 'transparent', 
-     justifyContent: 'flex-start',
-     paddingTop: 20,
-     alignItems: 'center', 
+    backgroundColor: 'transparent',
+    justifyContent: 'flex-start',
+    paddingTop: 20,
+    alignItems: 'center',
   },
   target: {
     width: TARGET_SIZE,
@@ -460,16 +464,16 @@ const styles = StyleSheet.create({
     textShadowRadius: 3,
   },
   finalScoreText: {
-      fontSize: 22,
-      fontWeight: 'bold',
-      color: '#E0E0E0',
-      marginTop: 10,
-      marginBottom: 5,
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#E0E0E0',
+    marginTop: 10,
+    marginBottom: 5,
   },
   rewardText: {
-      fontSize: 18,
-      color: '#4CAF50',
-      marginBottom: 20,
+    fontSize: 18,
+    color: '#4CAF50',
+    marginBottom: 20,
   },
   button: {
     backgroundColor: '#00BCD4',
@@ -485,9 +489,9 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 4,
   },
-   startButton: {
-      backgroundColor: '#4CAF50',
-   },
+  startButton: {
+    backgroundColor: '#4CAF50',
+  },
   buttonText: {
     color: '#fff',
     fontSize: 18,
@@ -506,22 +510,59 @@ const styles = StyleSheet.create({
   icon: {
     marginBottom: 15,
   },
-   waitText: {
+  waitText: {
     fontSize: 12,
     color: '#888',
     marginTop: 8,
   },
   backButton: {
-     position: 'absolute',
-     bottom: 20,
-     left: 20,
-     flexDirection: 'row',
-     alignItems: 'center',
-     padding: 10,
+    position: 'absolute',
+    bottom: 20,
+    left: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
   },
-   backButtonText: {
-      color: '#ccc',
-      fontSize: 16,
-      marginLeft: 5,
+  backButtonText: {
+    color: '#ccc',
+    fontSize: 16,
+    marginLeft: 5,
+  },
+
+  bannerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    backgroundColor: 'green',
+    position: 'relative',
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 6, // Optional: space between icon and text
+  },
+  bannerSpacer: {
+    width: 80, // same width as logoutButton to center text
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#408e39',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: 'white',
+    marginVertical: 5,
+    color: 'white',
+  },
+  navButtonRow: {
+    flexDirection: 'row',
+    gap: 10, // adds spacing between buttons (React Native 0.71+)
+    justifyContent: 'center', // optional: centers buttons horizontally
+    marginVertical: 10, // optional: spacing above/below
   },
 });

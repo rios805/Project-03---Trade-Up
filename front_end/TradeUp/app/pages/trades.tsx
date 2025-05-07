@@ -4,6 +4,7 @@ import { View, Text, StyleSheet, FlatList, Pressable, Alert, ActivityIndicator, 
 import axios from "axios";
 import { auth } from "../../utils/firebaseConfig";
 import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons"; // This is to import Ionicons
 
 const fetchTrades = async (token) => {
 	console.log("[TradesScreen] Fetching trades from /api/trades/me");
@@ -59,6 +60,9 @@ export default function TradesScreen() {
 		console.log("[TradesScreen] Component mounted or loadTrades changed.");
 		loadTrades();
 	}, [loadTrades]);
+
+	const handleGoToLogin = () => { router.push('/pages/login'); };
+	const handleGoToProfile = () => { router.push("/pages/profile"); };
 
 	const handleRespond = async (tradeId, status) => {
 		console.log(`[TradesScreen] handleRespond called for trade ${tradeId}, status: ${status}. Proceeding directly.`);
@@ -155,6 +159,19 @@ export default function TradesScreen() {
 
 	return (
 		<View style={styles.container}>
+			<View style={styles.bannerContainer}>
+				<View style={styles.bannerSpacer} />
+				<View style={styles.navButtonRow}>
+					<Pressable onPress={handleGoToProfile} style={({ pressed }) => [styles.logoutButton]}>
+						<Ionicons name="log-out-outline" size={18} color="#fff" style={styles.buttonIcon} />
+						<Text style={styles.buttonText}>Profile</Text>
+					</Pressable>
+					<Pressable onPress={handleGoToLogin} style={({ pressed }) => [styles.logoutButton]}>
+						<Ionicons name="log-out-outline" size={18} color="#fff" style={styles.buttonIcon} />
+						<Text style={styles.buttonText}>Logout</Text>
+					</Pressable>
+				</View >
+			</View >
 			<Text style={styles.title}>Your Trades</Text>
 			<FlatList data={trades} renderItem={renderTradeItem} keyExtractor={(item) => item.id.toString()} ListEmptyComponent={<Text style={styles.emptyText}>You have no active trades.</Text>} contentContainerStyle={styles.listContainer} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={loadTrades} colors={["#4CAF50"]} tintColor={"#4CAF50"} />} />
 		</View>
@@ -228,4 +245,41 @@ const styles = StyleSheet.create({
 	buttonText: { color: "#fff", fontWeight: "bold", fontSize: 13 },
 	emptyText: { color: "#888", textAlign: "center", marginTop: 50, fontSize: 16 },
 	errorText: { color: "#ff6347", textAlign: "center", fontSize: 16, marginBottom: 10 },
+
+	bannerContainer: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		paddingHorizontal: 10,
+		// paddingVertical: 10,
+		backgroundColor: 'black',
+		position: 'relative',
+	},
+	buttonText: {
+		color: 'white',
+		fontSize: 16,
+		fontWeight: 'bold',
+		marginLeft: 6, // Optional: space between icon and text
+	},
+	bannerSpacer: {
+		width: 80, // same width as logoutButton to center text
+	},
+	logoutButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		backgroundColor: '#408e39',
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 8,
+		borderWidth: 1,
+		borderColor: 'white',
+		marginVertical: 5,
+		color: 'white',
+	},
+	navButtonRow: {
+		flexDirection: 'row',
+		gap: 10, // adds spacing between buttons (React Native 0.71+)
+		justifyContent: 'center', // optional: centers buttons horizontally
+		marginVertical: 10, // optional: spacing above/below
+	},
 });
