@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { View, Text, StyleSheet, Image, ScrollView, useWindowDimensions, ActivityIndicator, Alert, RefreshControl, Pressable, SafeAreaView, StatusBar, Platform } from "react-native";
+import { View, Modal, Text, Picker, Button, StyleSheet, Image, ScrollView, useWindowDimensions, ActivityIndicator, Alert, RefreshControl, Pressable, SafeAreaView, StatusBar, Platform } from "react-native";
 import UserItem from "../../components/UserItem";
 import { useRouter } from "expo-router";
 import { auth } from "../../utils/firebaseConfig";
@@ -9,6 +9,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring, Easing } from "react-native-reanimated";
 import * as Haptics from "expo-haptics";
+import { LineChart } from 'react-native-chart-kit';
+import { Dimensions } from 'react-native';
 
 const AppColors = {
 	backgroundGradientStart: "#000000",
@@ -149,6 +151,11 @@ export default function ProfileScreen() {
 	const router = useRouter();
 	const { width: screenWidth } = useWindowDimensions();
 	const isWeb = Platform.OS === "web";
+	const [isHovered, setIsHovered] = useState(false);
+
+
+	const [isModalVisible, setModalVisible] = useState(false);
+	const [selectedItem, setSelectedItem] = useState("");
 
 	const fetchUserData = useCallback(
 		async (isRefresh = false) => {
@@ -219,6 +226,187 @@ export default function ProfileScreen() {
 		};
 	}, [router, fetchUserData, refreshing, loadingProfile]);
 
+	///////////////////////////////////////////////////////////////////////////////////////////////////////
+	// chart 
+
+	const [trades, setTrades] = useState([]);
+	const [loading, setLoading] = useState(true);
+	const [error, setError] = useState(null);
+	const [chartData, setChartData] = useState({ labels: [], datasets: [{ data: [] }] });
+	const [chartLabels, setChartLabels] = useState<string[]>([]);
+
+	/// --
+	// getting the trades
+
+	const fetchTrades = async (token) => {
+		console.log("[TradesScreen] Fetching trades from /api/trades/me");
+		const response = await axios.get(`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/trades/me`, {
+			headers: { Authorization: `Bearer ${token}` },
+		});
+		console.log("[TradesScreen] Received trades data:", response.data);
+		return response.data.trades || [];
+	};
+
+	const loadTrades = useCallback(async () => {
+		setError(null);
+		if (!refreshing) {
+			setLoading(true);
+		}
+		try {
+			const user = auth.currentUser;
+			if (!user) {
+				console.warn("[TradesScreen] User not logged in during loadTrades.");
+				throw new Error("User not logged in.");
+			}
+			console.log(`[TradesScreen] Current User UID for loading trades: ${user.uid}`);
+			const token = await user.getIdToken();
+			const fetchedTrades = await fetchTrades(token);
+			setTrades(fetchedTrades);
+		} catch (err) {
+			console.error("[TradesScreen] Failed to load trades:", err);
+			setError(err.message || "Failed to load trades.");
+			if (err?.response?.status === 401 || err?.response?.status === 403) {
+				Alert.alert("Session Expired", "Please log in again.", [{ text: "OK", onPress: () => router.replace("/pages/login") }]);
+			}
+		} finally {
+			setLoading(false);
+			setRefreshing(false);
+		}
+	}, [refreshing, router]);
+
+	useEffect(() => {
+		console.log("[TradesScreen] Component mounted or loadTrades changed.");
+		loadTrades();
+	}, [loadTrades]);
+
+	const handleRespond = async (tradeId, status) => {
+		console.log(`[TradesScreen] handleRespond called for trade ${tradeId}, status: ${status}. Proceeding directly.`);
+		try {
+			const user = auth.currentUser;
+			if (!user) throw new Error("User not logged in.");
+			const token = await user.getIdToken();
+			await respondToTrade(token, tradeId, status);
+			console.log(`[TradesScreen] Trade ${tradeId} ${status} successfully. Refreshing list...`);
+			Alert.alert("Success", `Trade ${status} successfully.`);
+			setRefreshing(true);
+			loadTrades();
+		} catch (err) {
+			console.error(`[TradesScreen] Failed to ${status} trade:`, err);
+			Alert.alert("Error", `Failed to ${status} trade: ${err.response?.data?.error || err.message}`);
+		}
+	};
+
+	useEffect(() => {
+		console.log("[TradesScreen] Component mounted or loadTrades changed.");
+		loadTrades();
+		console.log(trades);
+	}, [loadTrades]);
+
+	/// --
+
+	/// --
+	// parsing the trades data
+
+	useEffect(() => {
+		const processTradesData = () => {
+			// Step 1: Parse the created_at dates from trades
+			const tradeDates = trades.map(trade => new Date(trade.created_at));
+
+			// Step 2: Format the dates to something readable or suitable for chart labels
+			const formattedDates = tradeDates.map(date => date.toLocaleDateString());
+
+			// Step 3: Count the frequency of trades per day (or any other time period you want)
+			const dateCounts = formattedDates.reduce((acc, date) => {
+				acc[date] = (acc[date] || 0) + 1;
+				return acc;
+			}, {});
+
+			// Step 4: Prepare the chart data
+			const labels = Object.keys(dateCounts);  // unique dates
+			const values = Object.values(dateCounts); // count of trades for each date
+
+			setChartData({
+				labels: labels,
+				datasets: [
+					{
+						data: values,
+						strokeWidth: 2,
+					},
+				],
+			});
+		};
+
+		// Ensure that processTradesData is called only if trades exist
+		if (trades.length > 0) {
+			processTradesData();
+		}
+	}, [trades]); // Dependency array to trigger effect when `trades` 
+
+	/// --
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////
+	// liquidate
+
+	// Set the default selected item if available
+	useEffect(() => {
+		if (userItems.length > 0 && !selectedItem) {
+			setSelectedItem(userItems[0].id); // or keep it "" if you want to force selection
+		}
+	}, [userItems]);
+
+	const handleCashout = useCallback(async () => {
+		if (!selectedItem) {
+			Alert.alert("No Item Selected", "Please select an item to cash out.");
+			return;
+		}
+
+		try {
+			const user = auth.currentUser;
+			if (!user) {
+				Alert.alert("Error", "You must be logged in to cash out.");
+				return;
+			}
+
+			const token = await user.getIdToken(true);
+			console.log(`[Cashout] Attempting to cash out item ID: ${selectedItem}`);
+
+			const response = await axios.post(
+				`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/items/${selectedItem}/cashout`,
+				{}, // POST body (empty)
+				{
+					headers: { Authorization: `Bearer ${token}` },
+				}
+			);
+
+			console.log("[Cashout] Success:", response.data);
+			Alert.alert("Success", `Cashed out item for ${response.data.value} credits.`);
+			setModalVisible(false);
+
+			// Optionally refresh profile data
+			fetchUserData(true);
+		} catch (err) {
+			console.error("[Cashout] Error:", err);
+			const errorMsg = err.response?.data?.error || err.message || "Failed to cash out item.";
+			Alert.alert("Error", errorMsg);
+		}
+	}, [selectedItem, fetchUserData]);
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////
+	// profile image
+
+	useEffect(() => {
+		if (userName && userName !== "User") {
+			const avatarUrl = `https://avatars.abstractapi.com/v1/?api_key=1080d304eaea40c2bb35c6345beda69b&name=${encodeURIComponent(userName)}`;
+			setProfileImageUrl(avatarUrl);
+		}
+	}, [userName]);
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////
+
 	const numColumns = isWeb ? (screenWidth > 850 ? 3 : 2) : 2;
 
 	const scrollContentContainerHorizontalPadding = styles.scrollContentContainer.paddingHorizontal || 0;
@@ -272,6 +460,7 @@ export default function ProfileScreen() {
 		{ title: "My Trades", icon: "swap-horizontal-outline", onPress: handleGoToTrades, accentColor: AppColors.primary, hoverBg: AppColors.hoverPrimaryBg, glowColor: AppColors.glowPrimary },
 		{ title: "Daily Reward", icon: "gift-outline", onPress: handleGoToDailyReward, accentColor: AppColors.accentGreen, hoverBg: AppColors.hoverGreenBg, glowColor: AppColors.glowGreen },
 		{ title: "Reaction Game", icon: "flash-outline", onPress: handleGoToReactionGame, accentColor: AppColors.accentGreen, hoverBg: AppColors.hoverGreenBg, glowColor: AppColors.glowGreen },
+		{ title: "Liquidate Item", icon: "logo-usd", onPress: () => setModalVisible(true), accentColor: AppColors.accentGreen, hoverBg: AppColors.hoverGreenBg, glowColor: AppColors.glowGreen },
 	];
 
 	return (
@@ -285,7 +474,10 @@ export default function ProfileScreen() {
 						<Ionicons name="settings-outline" size={22} color={AppColors.textSecondary} />
 					</AnimatedPressable>
 				</View>
+
+
 				<ScrollView contentContainerStyle={styles.scrollContentContainer} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[AppColors.accentGreen]} tintColor={AppColors.accentGreen} />} showsVerticalScrollIndicator={false}>
+
 					<View style={styles.headerContainer}>
 						<Image source={{ uri: profileImageUrl }} style={styles.profileImage} />
 						<Text style={styles.userNameText}>{userName}</Text>
@@ -294,6 +486,42 @@ export default function ProfileScreen() {
 							<Image source={images.threeStar} style={styles.ratingImage} />
 						</View>
 					</View>
+
+					<View style={{ marginBottom: 24 }}>
+						{chartData.labels.length > 0 ? (
+							<LineChart
+								data={chartData}
+								width={screenWidth - 32} // Adjust to fit nicely
+								width={500} // fixed width
+								height={220}
+								yAxisLabel=""
+								chartConfig={{
+									backgroundColor: "#4CAF50",
+									backgroundGradientFrom: "#81C784",
+									backgroundGradientTo: "#388E3C",
+									decimalPlaces: 0,
+									color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+									labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+									style: {
+										borderRadius: 16,
+									},
+									propsForDots: {
+										r: "4",
+										strokeWidth: "2",
+										stroke: "#fff",
+									},
+								}}
+								bezier
+								style={{
+									marginVertical: 8,
+									borderRadius: 16,
+								}}
+							/>
+						) : (
+							<Text>No activity to display</Text>
+						)}
+					</View>
+
 					<View style={styles.statsContainer}>
 						<View style={styles.statBox}>
 							<Text style={styles.statLabel}>Trade Credits</Text>
@@ -314,6 +542,52 @@ export default function ProfileScreen() {
 							</AnimatedPressable>
 						))}
 					</View>
+
+					<Modal
+						visible={isModalVisible}
+						animationType="slide"
+						transparent={true}
+						onRequestClose={() => setModalVisible(false)}
+					>
+						<View style={styles.modalBackground}>
+							<View style={styles.modalContainer}>
+								{/* X Button in top right */}
+								<Pressable
+									onPress={() => setModalVisible(false)}
+									style={styles.modalCloseButton}
+								>
+									<Text style={styles.modalCloseText}>✕</Text>
+								</Pressable>
+
+								<Text style={styles.modalTitle}>Select an Item</Text>
+
+								<Picker
+									selectedValue={selectedItem}
+									onValueChange={(itemValue) => setSelectedItem(itemValue)}
+									style={styles.modalPicker}
+								>
+									{userItems.map((item) => (
+										<Picker.Item key={item.id} label={item.name} value={item.id} />
+									))}
+								</Picker>
+
+								<Pressable
+									onPress={() => {
+										handleCashout();
+										setModalVisible(false);
+									}}
+									onHoverIn={() => setIsHovered(true)}
+									onHoverOut={() => setIsHovered(false)}
+									style={[
+										styles.modalButton,
+										isHovered && styles.modalButtonHover
+									]}
+								>
+									<Text style={[styles.modalButtonText]}>Cashout</Text>
+								</Pressable>
+							</View>
+						</View>
+					</Modal>
 
 					<Text style={styles.inventoryTitle}>Your Inventory</Text>
 					{userItems.length > 0 ? (
@@ -434,7 +708,6 @@ const styles = StyleSheet.create({
 		elevation: 5,
 	},
 	utilityButtonText: { color: AppColors.buttonTextPrimary, fontSize: 16, fontWeight: "600", fontFamily: "sans-serif-medium" },
-
 	inventoryTitle: {
 		fontSize: 20,
 		fontWeight: "600",
@@ -454,4 +727,69 @@ const styles = StyleSheet.create({
 		paddingHorizontal: GRID_CONTAINER_PADDING,
 	},
 	userItemWrapper: {},
+	modalBackground: {
+		flex: 1,
+		justifyContent: 'center',
+		alignItems: 'center',
+		backgroundColor: "#000000aa",
+	},
+	modalContainer: {
+		backgroundColor: 'white',
+		padding: 20,
+		borderRadius: 15,
+		width: '80%',
+		maxWidth: 400, // prevents it from getting too wide
+		position: 'relative',
+		shadowColor: '#000',
+		shadowOpacity: 0.2,
+		shadowRadius: 10,
+		elevation: 5,
+		alignSelf: 'center',
+	},
+	modalCloseButton: {
+		position: 'absolute',
+		top: 10,
+		right: 10,
+		zIndex: 1,
+		padding: 10,
+	},
+	modalCloseText: {
+		fontSize: 22,
+		fontWeight: 'bold',
+		color: '#333',
+	},
+	modalButton: {
+		backgroundColor: 'white',
+		padding: 10,
+		borderRadius: 5,
+		borderColor: '#ff3b30', // Your border color
+		borderWidth: 1, // Ensure border width is set
+	},
+	modalButtonHover: {
+		backgroundColor: '#ff3b30',
+		padding: 10,
+		borderRadius: 5,
+		borderColor: '#ff3b30', // Your border color
+		borderWidth: 1, // Ensure border width is set
+	},
+	modalButtonText: {
+		color: 'black',
+		textAlign: 'center',
+		fontWeight: 'bold',
+	},
+	modalTitle: {
+		marginBottom: 15,
+		textAlign: 'center',
+		fontSize: 18,
+		fontWeight: '600',
+		color: '#333',
+	},
+	modalPicker: {
+		height: 50,
+		width: '100%',
+		marginBottom: 20,
+		borderWidth: 1,
+		borderColor: '#ddd',
+		borderRadius: 5,
+	},
 });
