@@ -49,7 +49,7 @@ export default function LandingScreen() {
 					<View style={styles.contentContainer}>
 						<Text style={styles.title}>TradeUp</Text>
 						<Text style={styles.subtitle}>
-							Your Premier Marketplace for Trading Collectibles.
+							Your Marketplace for Trading Collectibles.
 							{"\n"}
 							Discover. Barter. Elevate.
 						</Text>
@@ -90,6 +90,7 @@ const styles = StyleSheet.create({
 		justifyContent: "center",
 		alignItems: "center",
 		maxHeight: "30%",
+		marginTop: 100,
 	},
 	contentContainer: {
 		alignItems: "center",
@@ -104,6 +105,7 @@ const styles = StyleSheet.create({
 		marginBottom: 10,
 		fontFamily: "sans-serif-condensed",
 		letterSpacing: -0.5,
+		
 	},
 	subtitle: {
 		fontSize: 17,
@@ -113,6 +115,7 @@ const styles = StyleSheet.create({
 		fontFamily: "sans-serif-light",
 		lineHeight: 24,
 		paddingHorizontal: 10,
+		marginBottom: 360,
 	},
 	buttonContainer: {
 		width: "100%",

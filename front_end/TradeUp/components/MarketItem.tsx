@@ -58,7 +58,7 @@ export default function MarketItem({ id, imageUrl, price, title, description, ow
 	const [tradeModalVisible, setTradeModalVisible] = useState(false);
 
 	const [inputPrice, setInputPrice] = useState(price);
-	const [multiplier, setMultiplier] = useState(1);
+	const [multiplier, setMultiplier] = useState(1); 
 
 	const [chatMessages, setChatMessages] = useState([]);
 	const [message, setMessage] = useState("");
@@ -71,6 +71,7 @@ export default function MarketItem({ id, imageUrl, price, title, description, ow
 	const [isLoading, setIsLoading] = useState(false);
 
 	const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+	const router = useRouter();
 
 	const modalWidth = Platform.OS === "web" ? Math.min(500, windowWidth * 0.8) : windowWidth * 0.9;
 
@@ -78,7 +79,7 @@ export default function MarketItem({ id, imageUrl, price, title, description, ow
 		setBuyModalVisible(false);
 		setBargainModalVisible(false);
 		setTradeModalVisible(false);
-		setInventoryError(null);
+		setInventoryError(null); 
 	};
 
 	const openTradeModal = async () => {
@@ -96,7 +97,7 @@ export default function MarketItem({ id, imageUrl, price, title, description, ow
 			const inventory = await fetchUserInventory(token);
 			setUserInventory(inventory);
 			if (inventory.length > 0) {
-				setSelectedTradeItem(inventory[0].id);
+				setSelectedTradeItem(inventory[0].id); 
 			} else {
 				setSelectedTradeItem(null);
 			}
@@ -122,7 +123,7 @@ export default function MarketItem({ id, imageUrl, price, title, description, ow
 			const response = await axios.post(`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/items/purchase`, { itemId: id, offeredPrice: inputPrice }, { headers: { Authorization: `Bearer ${token}` } });
 			closeAllModals();
 			Alert.alert("Purchase Successful", `You bought ${title} for $${inputPrice.toFixed(2)}`);
-			if (onPurchaseComplete) onPurchaseComplete(id);
+			if (onPurchaseComplete) onPurchaseComplete(id); 
 		} catch (error) {
 			console.error("Error purchasing item:", error);
 			Alert.alert("Purchase Failed", error.response?.data?.error || "There was an error processing your purchase");
@@ -157,7 +158,7 @@ export default function MarketItem({ id, imageUrl, price, title, description, ow
 			const token = await user.getIdToken();
 			const tradeData = {
 				item_offered_id: selectedTradeItem,
-				item_requested_id: id,
+				item_requested_id: id, 
 				responder_firebase_uid: ownerFirebaseUid,
 			};
 			await createTrade(token, tradeData);
@@ -180,7 +181,11 @@ export default function MarketItem({ id, imageUrl, price, title, description, ow
 
 	return (
 		<View style={itemCardStyle}>
-			<Image source={{ uri: imageUrl || "https://placehold.co/300x200/1C1C1E/FFFFFF?text=Item&font=sans-serif" }} style={styles.image} resizeMode="cover" />
+			<Image
+				source={{ uri: imageUrl || "https://placehold.co/300x200/1C1C1E/FFFFFF?text=Item&font=sans-serif" }}
+				style={styles.image}
+				resizeMode="cover" 
+			/>
 			<View style={styles.textContainer}>
 				<Text style={styles.title} numberOfLines={1} ellipsizeMode="tail">
 					{title || "Untitled Item"}
@@ -270,7 +275,7 @@ export default function MarketItem({ id, imageUrl, price, title, description, ow
 							keyExtractor={(item) => item.id}
 							style={styles.chatWindow}
 							contentContainerStyle={{ paddingBottom: 10 }}
-							inverted
+							inverted 
 						/>
 						<View style={styles.messageInputContainer}>
 							<TextInput style={styles.chatInput} value={message} onChangeText={setMessage} placeholder="Type your offer..." placeholderTextColor={AppColors.placeholderText} />
@@ -300,7 +305,13 @@ export default function MarketItem({ id, imageUrl, price, title, description, ow
 								<>
 									<Text style={styles.modalLabel}>Select your item to offer:</Text>
 									<View style={styles.pickerWrapper}>
-										<Picker selectedValue={selectedTradeItem} onValueChange={(itemValue) => setSelectedTradeItem(itemValue)} style={styles.picker} itemStyle={styles.pickerItem} dropdownIconColor={AppColors.textPrimary}>
+										<Picker
+											selectedValue={selectedTradeItem}
+											onValueChange={(itemValue) => setSelectedTradeItem(itemValue)}
+											style={styles.picker}
+											itemStyle={styles.pickerItem} 
+											dropdownIconColor={AppColors.textPrimary} 
+										>
 											{userInventory.map((item) => (
 												<Picker.Item key={item.id} label={`${item.name || "Unnamed Item"} (Value: $${item.hidden_value?.toFixed(2) || "N/A"})`} value={item.id} />
 											))}
@@ -331,10 +342,9 @@ const styles = StyleSheet.create({
 		shadowOffset: { width: 0, height: 4 },
 		shadowOpacity: 0.15,
 		shadowRadius: 12,
-		elevation: 5,
-		overflow: "hidden",
-		width: "100%",
-		height: "100%",
+		elevation: 5, 
+		overflow: "hidden", 
+		width: "100%", 
 	},
 	cardWeb: {
 		transition: "transform 0.2s ease-out, box-shadow 0.2s ease-out",
@@ -342,7 +352,7 @@ const styles = StyleSheet.create({
 	image: {
 		width: "100%",
 		aspectRatio: 1.5,
-		backgroundColor: AppColors.backgroundSecondary,
+		backgroundColor: AppColors.backgroundSecondary, 
 	},
 	textContainer: {
 		padding: 12,
@@ -377,7 +387,7 @@ const styles = StyleSheet.create({
 		backgroundColor: AppColors.cardBackground,
 	},
 	actionButton: {
-		flex: 1,
+		flex: 1, 
 		flexDirection: "row",
 		alignItems: "center",
 		justifyContent: "center",
@@ -385,7 +395,7 @@ const styles = StyleSheet.create({
 		paddingHorizontal: 6,
 		borderRadius: 8,
 		marginHorizontal: 4,
-		minHeight: 36,
+		minHeight: 36, 
 	},
 	buttonIcon: {
 		marginRight: 6,
@@ -397,7 +407,7 @@ const styles = StyleSheet.create({
 		fontFamily: "sans-serif",
 	},
 	buyButton: { backgroundColor: AppColors.accentGreen },
-	buyButtonPressed: { backgroundColor: "#2A8C4A" },
+	buyButtonPressed: { backgroundColor: "#2A8C4A" }, 
 	bargainButton: { backgroundColor: AppColors.accentBlue },
 	bargainButtonPressed: { backgroundColor: "#005FCE" },
 	tradeButton: { backgroundColor: AppColors.accentRed },
@@ -412,28 +422,28 @@ const styles = StyleSheet.create({
 	modalView: {
 		backgroundColor: AppColors.modalContentBackground,
 		borderRadius: 14,
-		padding: 0,
+		padding: 0, 
 		alignItems: "stretch",
 		shadowColor: "#000",
 		shadowOffset: { width: 0, height: 10 },
 		shadowOpacity: 0.3,
 		shadowRadius: 20,
 		elevation: 20,
-		maxHeight: "85%",
+		maxHeight: "85%", 
 		overflow: "hidden",
 	},
 	modalCloseButton: {
 		position: "absolute",
-		top: Platform.OS === "ios" ? 14 : 10,
+		top: Platform.OS === "ios" ? 14 : 10, 
 		right: Platform.OS === "ios" ? 14 : 10,
-		zIndex: 10,
+		zIndex: 10, 
 		padding: 6,
 		borderRadius: 18,
 		backgroundColor: "rgba(0,0,0,0.25)",
 	},
 	modalTitle: {
 		fontSize: 17,
-		fontWeight: "600",
+		fontWeight: "600", 
 		color: AppColors.modalTitleText,
 		textAlign: "center",
 		paddingVertical: 14,
@@ -444,8 +454,8 @@ const styles = StyleSheet.create({
 	},
 	modalScrollViewContent: {
 		paddingHorizontal: 20,
-		paddingTop: 10,
-		paddingBottom: 15,
+		paddingTop: 10, 
+		paddingBottom: 15, 
 	},
 	modalLabel: {
 		marginTop: 15,
@@ -468,13 +478,13 @@ const styles = StyleSheet.create({
 		paddingVertical: 6,
 	},
 	stepperButton: {
-		padding: 10,
+		padding: 10, 
 	},
 	priceText: {
 		fontSize: 19,
 		fontWeight: "600",
 		color: AppColors.textPrimary,
-		minWidth: 90,
+		minWidth: 90, 
 		textAlign: "center",
 		fontFamily: "sans-serif",
 	},
@@ -483,10 +493,10 @@ const styles = StyleSheet.create({
 		paddingVertical: 15,
 		borderRadius: 10,
 		alignItems: "center",
-		marginHorizontal: 20,
-		marginTop: 10,
-		marginBottom: Platform.OS === "ios" ? 25 : 20,
-		minHeight: 50,
+		marginHorizontal: 20, 
+		marginTop: 10, 
+		marginBottom: Platform.OS === "ios" ? 25 : 20, 
+		minHeight: 50, 
 	},
 	modalConfirmButtonPressed: {
 		backgroundColor: "#005FCE",
@@ -501,6 +511,7 @@ const styles = StyleSheet.create({
 		fontWeight: "600",
 		fontFamily: "sans-serif",
 	},
+	// Picker styles
 	pickerWrapper: {
 		borderWidth: 1,
 		borderColor: AppColors.modalInputBorder,
@@ -509,39 +520,40 @@ const styles = StyleSheet.create({
 		marginBottom: 20,
 		backgroundColor: AppColors.modalInputBackground,
 		overflow: "hidden",
-		height: Platform.OS === "ios" ? 180 : 50,
+		height: Platform.OS === "ios" ? 180 : 50, 
 		justifyContent: "center",
 	},
 	picker: {
 		width: "100%",
-		color: AppColors.textPrimary,
-		height: Platform.OS === "android" ? 50 : undefined,
+		color: AppColors.textPrimary, 
+		height: Platform.OS === "android" ? 50 : undefined, 
 	},
 	pickerItem: {
 		color: AppColors.textPrimary,
 		fontSize: 17,
-		height: 180,
+		height: 180, 
 		fontFamily: "sans-serif",
 	},
+
 	chatWindow: {
-		flex: 1,
+		flex: 1, 
 		width: "100%",
 		marginVertical: 10,
-		backgroundColor: AppColors.backgroundPrimary,
+		backgroundColor: AppColors.backgroundPrimary, 
 		borderRadius: 10,
 		padding: 10,
 	},
 	chatBubble: {
 		paddingVertical: 10,
 		paddingHorizontal: 14,
-		borderRadius: 20,
+		borderRadius: 20, 
 		marginVertical: 5,
-		maxWidth: "80%",
+		maxWidth: "80%", 
 	},
 	userBubble: {
 		backgroundColor: AppColors.accentBlue,
 		alignSelf: "flex-end",
-		borderBottomRightRadius: 8,
+		borderBottomRightRadius: 8, 
 	},
 	sellerBubble: {
 		backgroundColor: AppColors.fillTertiary,
@@ -567,7 +579,7 @@ const styles = StyleSheet.create({
 	chatInput: {
 		flex: 1,
 		backgroundColor: AppColors.modalInputBackground,
-		borderRadius: 22,
+		borderRadius: 22, 
 		paddingVertical: Platform.OS === "ios" ? 12 : 10,
 		paddingHorizontal: 18,
 		marginRight: 10,
@@ -578,7 +590,7 @@ const styles = StyleSheet.create({
 	sendButton: {
 		backgroundColor: AppColors.accentBlue,
 		padding: 12,
-		borderRadius: 22,
+		borderRadius: 22, 
 		justifyContent: "center",
 		alignItems: "center",
 	},

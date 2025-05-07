@@ -1,9 +1,23 @@
 // @ts-nocheck
 import React, { useState, useRef } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, useWindowDimensions, ActivityIndicator, KeyboardAvoidingView, Platform, Keyboard, ScrollView, SafeAreaView } from "react-native";
+import {
+	View,
+	Text,
+	TextInput,
+	Pressable,
+	StyleSheet,
+	useWindowDimensions,
+	ActivityIndicator,
+	KeyboardAvoidingView,
+	Platform,
+	Keyboard,
+	ScrollView,
+	SafeAreaView,
+	StatusBar, 
+} from "react-native";
 import { useRouter } from "expo-router";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { auth } from "../../utils/firebaseConfig"; 
+import { auth } from "../../utils/firebaseConfig";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -32,7 +46,7 @@ export default function LoginScreen() {
 	const [passwordFocused, setPasswordFocused] = useState(false);
 
 	const { width } = useWindowDimensions();
-	const isWeb = Platform.OS === "web";
+	const isWeb = Platform.OS === "web"; 
 	const router = useRouter();
 
 	const emailInputRef = useRef<TextInput>(null);
@@ -49,7 +63,7 @@ export default function LoginScreen() {
 		try {
 			await signInWithEmailAndPassword(auth, email.trim(), password);
 			console.log("[LoginScreen] Firebase login successful.");
-			router.replace("/pages/profile");
+			router.replace("/pages/profile"); 
 		} catch (e: any) {
 			console.error("[LoginScreen] Firebase login error:", e.code, e.message);
 			let friendlyMessage = "Login failed. Please check your credentials.";
@@ -69,13 +83,7 @@ export default function LoginScreen() {
 			<SafeAreaView style={styles.safeArea}>
 				{Platform.OS !== "web" && <StatusBar barStyle="light-content" />}
 				<KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.keyboardAvoidingContainer}>
-					<ScrollView
-						contentContainerStyle={styles.scrollContainer}
-						keyboardShouldPersistTaps="handled"
-						keyboardDismissMode="on-drag"
-						showsVerticalScrollIndicator={false}
-						style={styles.scrollViewStyle}
-					>
+					<ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" showsVerticalScrollIndicator={false} style={styles.scrollViewStyle}>
 						<View style={[styles.formWrapper, isWeb && { maxWidth: 420 }]}>
 							<Ionicons name="key-outline" size={56} color={AppColors.primary} style={styles.icon} />
 							<Text style={styles.title}>Welcome Back</Text>
@@ -151,7 +159,7 @@ const styles = StyleSheet.create({
 	},
 	errorText: {
 		color: AppColors.errorText,
-		marginBottom: 18, 
+		marginBottom: 18,
 		fontSize: 14,
 		textAlign: "center",
 		fontFamily: "sans-serif",
@@ -159,9 +167,9 @@ const styles = StyleSheet.create({
 	input: {
 		backgroundColor: AppColors.inputBackground,
 		paddingVertical: 15,
-		paddingHorizontal: 18, 
+		paddingHorizontal: 18,
 		borderRadius: 12,
-		marginBottom: 18, 
+		marginBottom: 18,
 		fontSize: 16,
 		color: AppColors.textPrimary,
 		width: "100%",
@@ -171,25 +179,25 @@ const styles = StyleSheet.create({
 	},
 	inputFocused: {
 		borderColor: AppColors.inputFocusBorder,
-		shadowColor: AppColors.inputFocusBorder,
+		shadowColor: AppColors.inputFocusBorder, 
 		shadowOffset: { width: 0, height: 0 },
 		shadowOpacity: 0.7,
 		shadowRadius: 5,
-		elevation: 4,
+		elevation: 4, 
 	},
 	primaryButton: {
 		backgroundColor: AppColors.primary,
-		paddingVertical: 16, 
+		paddingVertical: 16,
 		borderRadius: 12,
 		alignItems: "center",
 		width: "100%",
 		minHeight: 52,
 		marginTop: 15,
-		shadowColor: "#000",
+		shadowColor: "#000", 
 		shadowOffset: { width: 0, height: 2 },
 		shadowOpacity: 0.25,
 		shadowRadius: 3.5,
-		elevation: 4,
+		elevation: 4, 
 	},
 	buttonDisabled: {
 		opacity: 0.5,
@@ -199,19 +207,19 @@ const styles = StyleSheet.create({
 	},
 	primaryButtonText: {
 		color: AppColors.buttonTextPrimary,
-		fontSize: 16, 
+		fontSize: 16,
 		fontWeight: "600",
 		fontFamily: "sans-serif-medium",
 	},
 	footer: {
 		flexDirection: "row",
 		marginTop: 30,
-		paddingBottom: 25,
+		paddingBottom: 25, 
 		justifyContent: "center",
 	},
 	footerText: {
 		color: AppColors.textSecondary,
-		fontSize: 14, 
+		fontSize: 14,
 		fontFamily: "sans-serif",
 	},
 	linkText: {
