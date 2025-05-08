@@ -137,6 +137,7 @@ export default function Profile() {
 	const handleGoToTrades = () => router.push("/pages/trades");
 	const handleGoToDailyReward = () => router.push("/pages/dailyReward");
 	const handleGoToReactionGame = () => router.push("/pages/reactionGame");
+	const handleGoToLeaderboard = () => router.push("/pages/leaderboard");
 
 	if (loadingProfile && !refreshing) {
 		return (
@@ -215,6 +216,16 @@ export default function Profile() {
 				<Pressable onPress={handleGoToTrades} style={({ pressed }) => [styles.button, styles.navButton, pressed && styles.buttonPressed]}>
 					<Ionicons name="swap-horizontal-outline" size={18} color="#fff" style={styles.buttonIcon} />
 					<Text style={styles.buttonText}>Trades</Text>
+				</Pressable>
+			</View>
+			<View style={[styles.navigationButtonsContainer, styles.buttonRow]}>
+				<Pressable onPress={() => router.push("/pages/addItem")} style={({ pressed }) => [styles.button, styles.navButton, pressed && styles.buttonPressed]}>
+					<Ionicons name="add-circle-outline" size={18} color="#fff" style={styles.buttonIcon} />
+					<Text style={styles.buttonText}>Add Item</Text>
+				</Pressable>
+				<Pressable onPress={() => router.push("/pages/leaderBoard")} style={({ pressed }) => [styles.button, styles.navButton, pressed && styles.buttonPressed]}>
+					<Ionicons name="trophy-outline" size={18} color="#fff" style={styles.buttonIcon} />
+					<Text style={styles.buttonText}>Leader Board</Text>
 				</Pressable>
 			</View>
 
