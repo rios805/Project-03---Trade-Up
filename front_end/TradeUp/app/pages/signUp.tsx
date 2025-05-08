@@ -1,6 +1,6 @@
 // @ts-nocheck
 import React, { useState, useRef } from "react";
-import { View, Text, TextInput, Pressable, StyleSheet, useWindowDimensions, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Keyboard, ScrollView, SafeAreaView } from "react-native";
+import { View, Text, TextInput, Pressable, StyleSheet, useWindowDimensions, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Keyboard, ScrollView, SafeAreaView, StatusBar} from "react-native";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../utils/firebaseConfig";
 import { useRouter } from "expo-router";
