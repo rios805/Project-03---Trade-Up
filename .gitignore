@@ -1,3 +1,5 @@
 front_end/TradeUp/.env
 backend/.env
 .DS_Store
+front_end/TradeUp/app/pages/signUp.tsx
+.env

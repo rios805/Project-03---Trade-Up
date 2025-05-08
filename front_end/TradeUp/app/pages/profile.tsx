@@ -1,8 +1,9 @@
 // @ts-nocheck
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { View, Modal, Text, Picker, Button, StyleSheet, Image, ScrollView, useWindowDimensions, ActivityIndicator, Alert, RefreshControl, Pressable, SafeAreaView, StatusBar, Platform } from "react-native";
+import { View, Modal, Text, Button, StyleSheet, Image, ScrollView, useWindowDimensions, ActivityIndicator, Alert, RefreshControl, Pressable, SafeAreaView, StatusBar, Platform } from "react-native";
 import UserItem from "../../components/UserItem";
 import { useRouter } from "expo-router";
+import { Picker } from '@react-native-picker/picker';
 import { auth } from "../../utils/firebaseConfig";
 import axios from "axios";
 import { Ionicons } from "@expo/vector-icons";
