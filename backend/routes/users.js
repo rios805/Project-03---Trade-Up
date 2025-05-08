@@ -76,4 +76,29 @@ router.put("/update", authenticate, async (req, res) => {
 	}
 });
 
+// GET /api/users/leaderboard - Get total item value + trade credit for current user
+router.get("/leaderboard", async (req, res) => {
+	try {
+		const [rows] = await pool.query(`
+			SELECT 
+				u.id AS user_id,
+				u.username,
+				COALESCE(SUM(i.hidden_value), 0) AS total_item_value,
+				u.trade_credit,
+				COALESCE(SUM(i.hidden_value), 0) + u.trade_credit AS total_score
+			FROM users u
+			LEFT JOIN items i ON u.id = i.owner_id
+			GROUP BY u.id
+			ORDER BY total_score DESC
+			LIMIT 10;
+		`);
+
+		res.json(rows);
+	} catch (err) {
+		console.error("Error fetching leaderboard:", err);
+		res.status(500).json({ error: "Failed to fetch leaderboard" });
+	}
+});
+
+
 module.exports = router;

@@ -457,6 +457,8 @@ export default function ProfileScreen() {
 	const handleGoToDailyReward = () => router.push("/pages/dailyReward");
 	const handleGoToDailyChallenge = () => router.push("/pages/dailyChallenge");
 	const handleGoToReactionGame = () => router.push("/pages/reactionGame");
+	const handleGoToLeaderboard = () => router.push("/pages/leaderBoard");
+	const handleGoToAddItem = () => router.push("/pages/addItem");
 	const handleGoToEditAccount = () => router.push("/(tabs)/editAccountPage");
 
 	if (loadingProfile && !refreshing) {
@@ -498,6 +500,8 @@ export default function ProfileScreen() {
 		{ title: "Daily Reward", icon: "gift-outline", onPress: handleGoToDailyReward, accentColor: AppColors.accentGreen, hoverBg: AppColors.hoverGreenBg, glowColor: AppColors.glowGreen },
 		{ title: "Daily Challenge", icon: "trophy-outline", onPress: handleGoToDailyChallenge, accentColor: AppColors.accentGreen, hoverBg: AppColors.hoverGreenBg, glowColor: AppColors.glowGreen },
 		{ title: "Reaction Game", icon: "flash-outline", onPress: handleGoToReactionGame, accentColor: AppColors.accentGreen, hoverBg: AppColors.hoverGreenBg, glowColor: AppColors.glowGreen },
+		{ title: "Leader Board", icon: "trophy-outline", onPress: handleGoToLeaderboard, accentColor: AppColors.accentGreen, hoverBg: AppColors.hoverGreenBg, glowColor: AppColors.glowGreen },
+		{ title: "Add Item", icon: "add-circle-outline", onPress: handleGoToAddItem, accentColor: AppColors.accentGreen, hoverBg: AppColors.hoverGreenBg, glowColor: AppColors.glowGreen },
 		{ title: "Liquidate Item", icon: "logo-usd", onPress: () => setModalVisible(true), accentColor: AppColors.accentGreen, hoverBg: AppColors.hoverGreenBg, glowColor: AppColors.glowGreen },
 	];
 

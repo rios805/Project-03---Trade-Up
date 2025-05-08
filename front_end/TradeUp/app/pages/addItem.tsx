@@ -1,123 +1,178 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, Pressable, StyleSheet, useWindowDimensions, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
+// front_end/TradeUp/app/pages/addItem.tsx
 
-export default function AddItemScreen() {
-  const [formData, setFormData] = useState({
-    name: '',
-    description: '',
-    image_url: '',
-    hidden_value: '',
-    item_type: '',
-    owner_id: ''
-  });
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  Alert,
+  ScrollView,
+  useWindowDimensions,
+} from 'react-native';
+import { auth } from '../../utils/firebaseConfig';
+import { useRouter } from 'expo-router';
+import axios from 'axios';
+
+export default function AddItemPage() {
+  const [itemName, setItemName] = useState('');
+  const [description, setDescription] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [itemType, setItemType] = useState('');
+  const [hiddenValue, setHiddenValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
   const { width } = useWindowDimensions();
   const isWeb = width >= 768;
   const router = useRouter();
 
-  const handleChange = (key: keyof typeof formData, value: string) => {
-    setFormData(prev => ({ ...prev, [key]: value }));
-  };
-
   const handleSubmit = async () => {
+    if (!itemName || !description || !itemType || !hiddenValue) {
+      Alert.alert('Missing fields', 'Please fill out all fields.');
+      return;
+    }
+
     try {
-      const response = await fetch('https://your-api.com/api/items', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+      setIsLoading(true);
+      const user = auth.currentUser;
+
+      if (!user) {
+        Alert.alert('Error', 'User not authenticated');
+        return;
+      }
+
+      const token = await user.getIdToken();
+      const backendUrl = `${process.env.EXPO_PUBLIC_BACKEND_URL}/api/items/create`;
+
+      const itemData = {
+        name: itemName,
+        description,
+        image_url: imageUrl || null,
+        item_type: itemType,
+        hidden_value: hiddenValue,
+      };
+
+      const response = await axios.post(backendUrl, itemData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
       });
 
-      if (!response.ok) throw new Error('Failed to add item');
-      alert('Item added successfully!');
+      console.log('✅ Item added:', response.data);
+      Alert.alert('Success', 'Item added successfully!');
       router.push('/pages/profile');
-    } catch (err) {
-      console.error(err);
-      alert('Error adding item');
+    } catch (error: any) {
+      console.error('❌ Error adding item:', error.message);
+      Alert.alert('Error', 'Failed to add item');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.scrollContainer}>
-      <View style={styles.container}>
-        <View style={[styles.formContainer, isWeb && styles.webForm]}>
-          <Text style={styles.title}>Add New Item</Text>
+    <ScrollView contentContainerStyle={styles.container}>
+      <View style={[styles.formContainer, isWeb && styles.webForm]}>
+        <Text style={styles.title}>Add New Item</Text>
 
-          {Object.keys(formData).map((field) => (
-            <TextInput
-              key={field}
-              style={[styles.input, isWeb && styles.inputWeb]}
-              placeholder={field.replace('_', ' ')}
-              placeholderTextColor="#ccc"
-              value={formData[field as keyof typeof formData]}
-              onChangeText={(value) => handleChange(field as keyof typeof formData, value)}
-            />
-          ))}
+        <TextInput
+          style={styles.input}
+          placeholder="Item Name"
+          placeholderTextColor="#ccc"
+          value={itemName}
+          onChangeText={setItemName}
+        />
 
-          <Pressable
-            style={[styles.submitButton, isWeb && styles.buttonWeb]}
-            onPress={handleSubmit}
-          >
-            <Text style={styles.submitText}>Submit</Text>
-          </Pressable>
-        </View>
+        <TextInput
+          style={styles.input}
+          placeholder="Description"
+          placeholderTextColor="#ccc"
+          value={description}
+          onChangeText={setDescription}
+          multiline
+        />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Image URL (optional)"
+          placeholderTextColor="#ccc"
+          value={imageUrl}
+          onChangeText={setImageUrl}
+        />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Item Type"
+          placeholderTextColor="#ccc"
+          value={itemType}
+          onChangeText={setItemType}
+        />
+
+        <TextInput
+          style={styles.input}
+          placeholder="Hidden Value"
+          placeholderTextColor="#ccc"
+          value={hiddenValue}
+          onChangeText={setHiddenValue}
+        />
+
+        <Pressable
+          style={[styles.submitButton, isLoading && styles.buttonDisabled]}
+          onPress={handleSubmit}
+          disabled={isLoading}
+        >
+          <Text style={styles.buttonText}>
+            {isLoading ? 'Submitting...' : 'Add Item'}
+          </Text>
+        </Pressable>
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-  },
   container: {
-    flex: 1,
+    flexGrow: 1,
     backgroundColor: '#000',
     justifyContent: 'center',
-    padding: 24,
     alignItems: 'center',
+    padding: 24,
   },
   formContainer: {
     width: '100%',
   },
   webForm: {
     maxWidth: 400,
-    width: '100%',
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
-    textAlign: 'center',
     color: '#4CAF50',
-    marginBottom: 36,
+    textAlign: 'center',
+    marginBottom: 24,
   },
   input: {
     backgroundColor: '#333',
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    borderColor: '#4CAF50',
-    borderWidth: 1,
-    marginBottom: 20,
-    fontSize: 16,
     color: '#fff',
-    width: '100%',
-  },
-  inputWeb: {
-    alignSelf: 'center',
+    borderWidth: 1,
+    borderColor: '#4CAF50',
+    borderRadius: 8,
+    padding: 14,
+    fontSize: 16,
+    marginBottom: 16,
   },
   submitButton: {
     backgroundColor: '#4CAF50',
     paddingVertical: 14,
     borderRadius: 8,
     alignItems: 'center',
-    width: '100%',
   },
-  buttonWeb: {
-    alignSelf: 'center',
+  buttonDisabled: {
+    backgroundColor: '#2E7D32',
+    opacity: 0.7,
   },
-  submitText: {
+  buttonText: {
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
