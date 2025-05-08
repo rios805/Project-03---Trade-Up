@@ -1,0 +1,28 @@
+# version: '3.8' # Removed obsolete version line
+
+services:
+  backend:
+    build: ./backend
+    container_name: tradeup-backend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    networks:
+      - app_network
+
+  frontend:
+    build: ./front_end/TradeUp
+    container_name: tradeup-frontend
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    depends_on:
+      - backend
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
