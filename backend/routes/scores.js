@@ -26,7 +26,7 @@ router.post("/finalize", authenticate, async (req, res) => {
 		}
 
 		res.json({
-			message: `Score finalized. +${result.earnedCredit} trade credit earned.`,
+			message: `Score finalized. +${result.earned_credit} trade credit earned.`,
 			score: result
 		});
 	} catch (err) {

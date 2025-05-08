@@ -1,4 +1,4 @@
-const pool = require("../db/pool");
+const pool = require("../db/pool").promise();
 const { getItemsByOwner } = require("../db/itemQueries");
 const { updateTradeCredit } = require("./userService");
 const { getUserDailyChallenge } = require("../db/challengeQueries");
@@ -6,9 +6,12 @@ const { getUserDailyChallenge } = require("../db/challengeQueries");
 async function initializeDailyScore(userId) {
 	const today = new Date().toISOString().split("T")[0];
 	const items = await getItemsByOwner(userId);
-	const baseScore = items.reduce((total, item) => total + item.hidden_value, 0);
+	const [[user]] = await pool.query("SELECT trade_credit FROM users WHERE id = ?", [userId]);
 
-	// Only insert once — don't overwrite if it already exists
+	const itemValue = items.reduce((total, item) => total + item.hidden_value, 0);
+	const tradeCredit = user?.trade_credit || 0;
+	const baseScore = itemValue + tradeCredit;
+
 	await pool.query(
 		"INSERT INTO daily_scores (user_id, score_date, base_score) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE base_score = base_score",
 		[userId, today, baseScore]
@@ -19,17 +22,19 @@ async function finalizeDailyScore(userId) {
 	const today = new Date().toISOString().split("T")[0];
 	const items = await getItemsByOwner(userId);
 
-	// Calculate starting item value — used only to derive bonus
-	const [[row]] = await pool.query(
-		"SELECT base_score FROM daily_scores WHERE user_id = ? AND score_date = ?",
+	const [[scoreRow]] = await pool.query(
+		"SELECT base_score FROM daily_scores WHERE user_id = ? AND DATE(score_date) = ?",
 		[userId, today]
 	);
 
-	if (!row) return null;
+	if (!scoreRow) return null;
 
-	const baseScore = row.base_score;
+	const baseScore = scoreRow.base_score;
+	const [[user]] = await pool.query("SELECT trade_credit FROM users WHERE id = ?", [userId]);
+	const tradeCredit = user?.trade_credit || 0;
 
-	// Include challenge bonus (calculated from base score)
+	const itemValueNow = items.reduce((total, item) => total + item.hidden_value, 0);
+
 	const challenge = await getUserDailyChallenge(userId);
 	let bonusFromChallenge = 0;
 
@@ -37,21 +42,26 @@ async function finalizeDailyScore(userId) {
 		bonusFromChallenge = Math.floor(baseScore * (challenge.bonus_percent / 100));
 	}
 
-	const finalScore = baseScore + bonusFromChallenge;
-
-	// Earned credit = for every 25% increase from base
-	// Earned currency = 25% of profit (final - base)
+	const finalScore = itemValueNow + tradeCredit + bonusFromChallenge;
 	const profit = finalScore - baseScore;
 	const earnedCredit = Math.max(0, Math.floor(profit * 0.25));
 
-	await pool.query(
-		`UPDATE daily_scores 
-		 SET final_score = ?, bonus_score = ?, earned_trade_credit = ? 
-		 WHERE user_id = ? AND score_date = ?`,
-		[finalScore, bonusFromChallenge, earnedCredit, userId, today]
+	// Write to users table
+	const [userUpdate] = await pool.query(
+	"UPDATE users SET trade_credit = ? WHERE id = ?",
+	[earnedCredit, userId]
 	);
 
-	await updateTradeCredit(userId, earnedCredit);
+	if (userUpdate.affectedRows === 0) {
+	console.warn(`[Finalize] No user row updated for user ${userId}`);
+	}
+
+	await pool.query(
+	`UPDATE daily_scores 
+	SET final_score = ?, bonus_score = ?, earned_trade_credit = ? 
+	WHERE user_id = ? AND DATE(score_date) = ?`,
+	[finalScore, bonusFromChallenge, earnedCredit, userId, today]
+	);
 
 	return {
 		base_score: baseScore,
