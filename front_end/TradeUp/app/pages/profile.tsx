@@ -153,6 +153,11 @@ export default function ProfileScreen() {
 	const { width: screenWidth } = useWindowDimensions();
 	const isWeb = Platform.OS === "web";
 	const [isHovered, setIsHovered] = useState(false);
+	// === [POPUP MODAL STATE ADDED] ===
+	const [finalScoreSummary, setFinalScoreSummary] = useState(null);
+	const [showEndOfDayModal, setShowEndOfDayModal] = useState(false);
+	const hasShownModalRef = useRef(false);
+
 
 
 	const [isModalVisible, setModalVisible] = useState(false);
@@ -195,6 +200,28 @@ export default function ProfileScreen() {
 		[router]
 	);
 
+	// === [CHECK FOR FINALIZED SCORE ADDED] ===
+	const checkIfDayFinalized = useCallback(async () => {
+		try {
+		if (hasShownModalRef.current) return;
+		const user = auth.currentUser;
+		if (!user) return;
+	
+		const token = await user.getIdToken();
+		const res = await axios.get(`${process.env.EXPO_PUBLIC_BACKEND_URL}/api/scores/today-summary`, {
+			headers: { Authorization: `Bearer ${token}` },
+		});
+	
+		if (res.data?.final_score && res.data?.earned_credit !== undefined) {
+			setFinalScoreSummary(res.data);
+			setShowEndOfDayModal(true);
+			hasShownModalRef.current = true;
+		}
+		} catch (err) {
+		console.log("[Profile] No final score yet:", err.response?.data || err.message);
+		}
+	}, []);
+
 	const onRefresh = useCallback(() => {
 		setRefreshing(true);
 		fetchUserData(true);
@@ -226,6 +253,14 @@ export default function ProfileScreen() {
 			unsubscribeAuth();
 		};
 	}, [router, fetchUserData, refreshing, loadingProfile]);
+
+	// === [POLLING FOR FINALIZATION ADDED] ===
+	useEffect(() => {
+		checkIfDayFinalized();
+		const interval = setInterval(checkIfDayFinalized, 60000); // every 1 min
+		return () => clearInterval(interval);
+	}, [checkIfDayFinalized]);
+	  
 
 	///////////////////////////////////////////////////////////////////////////////////////////////////////
 	// chart 
@@ -420,6 +455,7 @@ export default function ProfileScreen() {
 	const handleGoToMarket = () => router.push("/pages/market");
 	const handleGoToTrades = () => router.push("/pages/trades");
 	const handleGoToDailyReward = () => router.push("/pages/dailyReward");
+	const handleGoToDailyChallenge = () => router.push("/pages/dailyChallenge");
 	const handleGoToReactionGame = () => router.push("/pages/reactionGame");
 	const handleGoToEditAccount = () => router.push("/(tabs)/editAccountPage");
 
@@ -460,6 +496,7 @@ export default function ProfileScreen() {
 		{ title: "Marketplace", icon: "storefront-outline", onPress: handleGoToMarket, accentColor: AppColors.primary, hoverBg: AppColors.hoverPrimaryBg, glowColor: AppColors.glowPrimary },
 		{ title: "My Trades", icon: "swap-horizontal-outline", onPress: handleGoToTrades, accentColor: AppColors.primary, hoverBg: AppColors.hoverPrimaryBg, glowColor: AppColors.glowPrimary },
 		{ title: "Daily Reward", icon: "gift-outline", onPress: handleGoToDailyReward, accentColor: AppColors.accentGreen, hoverBg: AppColors.hoverGreenBg, glowColor: AppColors.glowGreen },
+		{ title: "Daily Challenge", icon: "trophy-outline", onPress: handleGoToDailyChallenge, accentColor: AppColors.accentGreen, hoverBg: AppColors.hoverGreenBg, glowColor: AppColors.glowGreen },
 		{ title: "Reaction Game", icon: "flash-outline", onPress: handleGoToReactionGame, accentColor: AppColors.accentGreen, hoverBg: AppColors.hoverGreenBg, glowColor: AppColors.glowGreen },
 		{ title: "Liquidate Item", icon: "logo-usd", onPress: () => setModalVisible(true), accentColor: AppColors.accentGreen, hoverBg: AppColors.hoverGreenBg, glowColor: AppColors.glowGreen },
 	];
@@ -611,6 +648,25 @@ export default function ProfileScreen() {
 						</View>
 					) : (
 						<Text style={styles.messageText}>Your inventory is empty.</Text>
+					)}
+					{showEndOfDayModal && finalScoreSummary && (
+						<Modal transparent animationType="fade" visible={showEndOfDayModal}>
+							<View style={styles.endOfDayModalOverlay}>
+								<View style={styles.endOfDayModalBox}>
+									<Text style={styles.endOfDayModalTitle}>Day Ended!</Text>
+									<Text>Base Score: {finalScoreSummary.base_score}</Text>
+									<Text>Bonus: {finalScoreSummary.challenge_bonus}</Text>
+									<Text>Final Score: {finalScoreSummary.final_score}</Text>
+									<Text>Trade Credits Earned: {finalScoreSummary.earned_credit}</Text>
+									<Pressable
+									style={styles.endOfDayModalButton}
+									onPress={() => setShowEndOfDayModal(false)}
+									>
+									<Text style={styles.endOfDayModalButtonText}>Start New Day</Text>
+									</Pressable>
+								</View>
+							</View>
+					  	</Modal>
 					)}
 				</ScrollView>
 			</SafeAreaView>
@@ -793,4 +849,36 @@ const styles = StyleSheet.create({
 		borderColor: '#ddd',
 		borderRadius: 5,
 	},
+	// === Styles for end-of-day summary popup ===
+	endOfDayModalOverlay: {
+		flex: 1,
+		backgroundColor: "rgba(0,0,0,0.6)",
+		justifyContent: "center",
+		alignItems: "center",
+	},
+	endOfDayModalBox: {
+		backgroundColor: "white",
+		padding: 20,
+		borderRadius: 12,
+		width: 300,
+		alignItems: "center",
+	},
+	endOfDayModalTitle: {
+		fontSize: 22,
+		fontWeight: "bold",
+		marginBottom: 15,
+	},
+	endOfDayModalButton: {
+		marginTop: 20,
+		backgroundColor: "#4CAF50",
+		paddingHorizontal: 30,
+		paddingVertical: 10,
+		borderRadius: 8,
+	},
+	endOfDayModalButtonText: {
+		color: "white",
+		fontSize: 16,
+		fontWeight: "600",
+	},
+  
 });

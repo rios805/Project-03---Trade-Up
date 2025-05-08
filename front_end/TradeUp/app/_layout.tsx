@@ -82,7 +82,12 @@ export default function RootLayout() {
 				name="pages/addItem"
 				options={commonAuthenticatedHeaderOptions("Add New Item")}
 			/>
-			<Stack.Screen name="+not-found" options={{ title: "Oops! Page Not Found" }} />
+			<Stack.Screen 
+				name="pages/dailyChallenge" 
+				options={commonAuthenticatedHeaderOptions("Daily Challenge")}
+			/>
+			<Stack.Screen name="+not-found" options={{ title: "Oops! Page Not Found" }}
+			/>
 		</Stack>
 	);
 }
