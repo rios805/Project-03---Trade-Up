@@ -8,6 +8,7 @@ const challengeRoutes = require("./routes/challenges"); // Using challenge route
 const scoreRoutes = require("./routes/scores"); //Using score routes
 const reactionGameRoutes = require("./routes/reactionGame"); //Using reaction game routes
 require("dotenv").config(); //to load up env variables
+require("./services/nodescheduler");
 
 const app = express();
 const PORT = 3000;
